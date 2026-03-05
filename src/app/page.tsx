@@ -68,6 +68,10 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
   link.click();
 }
 
+function getQRFilename(): string {
+  return `qr-${Date.now()}.png`;
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -106,12 +110,12 @@ export default function Home() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      downloadDataUrl(qrDataUrl!, "qr-code.png");
+      downloadDataUrl(qrDataUrl!, getQRFilename());
     }
   }, [qrDataUrl]);
 
   const handleDownload = useCallback(() => {
-    downloadDataUrl(qrDataUrl!, "qr-code.png");
+    downloadDataUrl(qrDataUrl!, getQRFilename());
   }, [qrDataUrl]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
