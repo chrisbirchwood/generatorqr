@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://generatorqr.vercel.app/sitemap.xml",
+    sitemap: "https://qr.birchcode.com/sitemap.xml",
   };
 }

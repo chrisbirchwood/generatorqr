@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "Generator kodów QR online - darmowy, szybki, bez rejestracji",
   description:
     "Wklej link i wygeneruj kod QR w sekundę. Skopiuj do schowka lub pobierz jako PNG. Darmowy, działa w przeglądarce, bez rejestracji.",
-  metadataBase: new URL("https://generatorqr.vercel.app"),
+  metadataBase: new URL("https://qr.birchcode.com"),
   alternates: {
     canonical: "/",
   },

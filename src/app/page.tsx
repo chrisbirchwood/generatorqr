@@ -2,96 +2,121 @@
 
 import { useState, useRef, useCallback } from "react";
 
+export function validateUrl(input: string): { valid: boolean; error?: string } {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return { valid: false, error: "Wprowadz link" };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return {
+      valid: false,
+      error: "Wprowadz poprawny URL (np. https://example.com)",
+    };
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return {
+      valid: false,
+      error: "Dozwolone sa tylko linki http:// i https://",
+    };
+  }
+
+  return { valid: true };
+}
+
+export async function generateQRToCanvas(
+  canvas: HTMLCanvasElement,
+  url: string
+): Promise<string> {
+  const QRCode = (await import("qrcode")).default;
+  await QRCode.toCanvas(canvas, url, {
+    width: 300,
+    margin: 2,
+    color: {
+      dark: "#000000",
+      light: "#ffffff",
+    },
+  });
+  return canvas.toDataURL("image/png");
+}
+
+export async function copyCanvasToClipboard(
+  canvas: HTMLCanvasElement
+): Promise<boolean> {
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => {
+      if (b) resolve(b);
+      else reject(new Error("Nie udalo sie skopiowac"));
+    }, "image/png");
+  });
+
+  await navigator.clipboard.write([
+    new ClipboardItem({ "image/png": blob }),
+  ]);
+
+  return true;
+}
+
+export function downloadDataUrl(dataUrl: string, filename: string) {
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = dataUrl;
+  link.click();
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const generateQR = useCallback(async () => {
-    const trimmed = url.trim();
-    if (!trimmed) {
-      setError("Wprowadz link");
-      return;
-    }
-
-    let parsed: URL;
-    try {
-      parsed = new URL(trimmed);
-    } catch {
-      setError("Wprowadz poprawny URL (np. https://example.com)");
-      return;
-    }
-
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      setError("Dozwolone sa tylko linki http:// i https://");
+  const handleGenerate = useCallback(async () => {
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      setError(validation.error!);
       return;
     }
 
     setError("");
     setCopied(false);
+    setLoading(true);
 
     try {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const QRCode = (await import("qrcode")).default;
-      await QRCode.toCanvas(canvas, trimmed, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#ffffff",
-        },
-      });
-
-      const dataUrl = canvas.toDataURL("image/png");
+      const dataUrl = await generateQRToCanvas(
+        canvasRef.current!,
+        url.trim()
+      );
       setQrDataUrl(dataUrl);
     } catch {
       setError("Nie udalo sie wygenerowac kodu QR");
+    } finally {
+      setLoading(false);
     }
   }, [url]);
 
-  const copyToClipboard = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
+  const handleCopy = useCallback(async () => {
     try {
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => {
-          if (b) resolve(b);
-          else reject(new Error("Nie udalo sie skopiowac"));
-        }, "image/png");
-      });
-
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
-      ]);
-
+      await copyCanvasToClipboard(canvasRef.current!);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      if (qrDataUrl) {
-        const link = document.createElement("a");
-        link.download = "qr-code.png";
-        link.href = qrDataUrl;
-        link.click();
-      }
+      downloadDataUrl(qrDataUrl!, "qr-code.png");
     }
   }, [qrDataUrl]);
 
-  const downloadQR = useCallback(() => {
-    if (!qrDataUrl) return;
-    const link = document.createElement("a");
-    link.download = "qr-code.png";
-    link.href = qrDataUrl;
-    link.click();
+  const handleDownload = useCallback(() => {
+    downloadDataUrl(qrDataUrl!, "qr-code.png");
   }, [qrDataUrl]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      generateQR();
+      handleGenerate();
     }
   };
 
@@ -124,10 +149,11 @@ export default function Home() {
               <p className="text-red-500 text-sm px-1">{error}</p>
             )}
             <button
-              onClick={generateQR}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-xl transition-colors text-sm sm:text-base cursor-pointer"
+              onClick={handleGenerate}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors text-sm sm:text-base cursor-pointer disabled:cursor-not-allowed"
             >
-              Generuj kod QR
+              {loading ? "Generowanie..." : "Generuj kod QR"}
             </button>
           </div>
 
@@ -145,7 +171,7 @@ export default function Home() {
 
               <div className="flex gap-3 w-full">
                 <button
-                  onClick={copyToClipboard}
+                  onClick={handleCopy}
                   className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all text-sm sm:text-base cursor-pointer ${
                     copied
                       ? "bg-green-100 text-green-700 border border-green-200"
@@ -155,7 +181,7 @@ export default function Home() {
                   {copied ? "Skopiowano!" : "Kopiuj"}
                 </button>
                 <button
-                  onClick={downloadQR}
+                  onClick={handleDownload}
                   className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium rounded-xl border border-slate-200 transition-colors text-sm sm:text-base cursor-pointer"
                 >
                   Pobierz
