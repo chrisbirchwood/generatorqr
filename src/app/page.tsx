@@ -17,10 +17,16 @@ export default function Home() {
       return;
     }
 
+    let parsed: URL;
     try {
-      new URL(trimmed);
+      parsed = new URL(trimmed);
     } catch {
       setError("Wprowadz poprawny URL (np. https://example.com)");
+      return;
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      setError("Dozwolone sa tylko linki http:// i https://");
       return;
     }
 
