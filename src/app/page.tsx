@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import QRCode from "qrcode";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -37,6 +36,7 @@ export default function Home() {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
+      const QRCode = (await import("qrcode")).default;
       await QRCode.toCanvas(canvas, trimmed, {
         width: 300,
         margin: 2,
