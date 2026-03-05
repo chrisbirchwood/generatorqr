@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+
+const URL_INPUT_ID = "qr-url";
+const URL_ERROR_ID = "qr-url-error";
 
 export function validateUrl(input: string): { valid: boolean; error?: string } {
   const trimmed = input.trim();
@@ -79,49 +83,90 @@ export default function Home() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const copyResetTimeoutRef = useRef<number | null>(null);
+  const isGeneratingRef = useRef(false);
 
-  const handleGenerate = useCallback(async () => {
-    const validation = validateUrl(url);
+  const clearCopyResetTimeout = () => {
+    if (copyResetTimeoutRef.current !== null) {
+      window.clearTimeout(copyResetTimeoutRef.current);
+      copyResetTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleGenerate = async () => {
+    if (isGeneratingRef.current) {
+      return;
+    }
+
+    clearCopyResetTimeout();
+    setCopied(false);
+    setQrDataUrl(null);
+
+    const trimmedUrl = url.trim();
+    const validation = validateUrl(trimmedUrl);
     if (!validation.valid) {
-      setError(validation.error!);
+      setError(validation.error ?? "Wprowadz poprawny URL");
       return;
     }
 
     setError("");
-    setCopied(false);
+    isGeneratingRef.current = true;
     setLoading(true);
 
     try {
-      const dataUrl = await generateQRToCanvas(
-        canvasRef.current!,
-        url.trim()
-      );
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error("Canvas not ready");
+      }
+
+      const dataUrl = await generateQRToCanvas(canvas, trimmedUrl);
       setQrDataUrl(dataUrl);
     } catch {
       setError("Nie udalo sie wygenerowac kodu QR");
     } finally {
+      isGeneratingRef.current = false;
       setLoading(false);
     }
-  }, [url]);
+  };
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !qrDataUrl) {
+      return;
+    }
+
     try {
-      await copyCanvasToClipboard(canvasRef.current!);
+      clearCopyResetTimeout();
+      await copyCanvasToClipboard(canvas);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyResetTimeoutRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyResetTimeoutRef.current = null;
+      }, 2000);
     } catch {
-      downloadDataUrl(qrDataUrl!, getQRFilename());
+      downloadDataUrl(qrDataUrl, getQRFilename());
     }
-  }, [qrDataUrl]);
+  };
 
-  const handleDownload = useCallback(() => {
-    downloadDataUrl(qrDataUrl!, getQRFilename());
-  }, [qrDataUrl]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleGenerate();
+  const handleDownload = () => {
+    if (!qrDataUrl) {
+      return;
     }
+
+    downloadDataUrl(qrDataUrl, getQRFilename());
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    void handleGenerate();
   };
 
   return (
@@ -137,38 +182,57 @@ export default function Home() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-6 sm:p-8">
-          <div className="flex flex-col gap-3">
+          <form
+            className="flex flex-col gap-3"
+            noValidate
+            onSubmit={handleSubmit}
+          >
+            <label
+              htmlFor={URL_INPUT_ID}
+              className="px-1 text-sm font-medium text-slate-700"
+            >
+              Link do zakodowania
+            </label>
             <input
+              id={URL_INPUT_ID}
               type="url"
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value);
                 setError("");
               }}
-              onKeyDown={handleKeyDown}
+              disabled={loading}
               placeholder="https://example.com"
+              autoComplete="url"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? URL_ERROR_ID : undefined}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
             />
             {error && (
-              <p className="text-red-500 text-sm px-1">{error}</p>
+              <p id={URL_ERROR_ID} className="text-red-500 text-sm px-1">
+                {error}
+              </p>
             )}
             <button
-              onClick={handleGenerate}
+              type="submit"
               disabled={loading}
               className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors text-sm sm:text-base cursor-pointer disabled:cursor-not-allowed"
             >
               {loading ? "Generowanie..." : "Generuj kod QR"}
             </button>
-          </div>
+          </form>
 
           <canvas ref={canvasRef} className="hidden" />
 
           {qrDataUrl && (
             <div className="mt-6 flex flex-col items-center gap-4">
               <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                <img
+                <Image
                   src={qrDataUrl}
                   alt="Kod QR"
+                  width={256}
+                  height={256}
+                  unoptimized
                   className="w-48 h-48 sm:w-64 sm:h-64"
                 />
               </div>

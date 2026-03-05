@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Home, {
@@ -16,7 +16,7 @@ vi.mock("qrcode", () => ({
 }));
 
 function getInput() {
-  return screen.getByPlaceholderText("https://example.com");
+  return screen.getByRole("textbox", { name: /link do zakodowania/i });
 }
 
 function getGenerateButton() {
@@ -180,6 +180,7 @@ describe("Home komponent", () => {
     render(<Home />);
     expect(screen.getByText("Generator QR")).toBeInTheDocument();
     expect(getInput()).toBeInTheDocument();
+    expect(getInput()).toHaveAccessibleName("Link do zakodowania");
     expect(getGenerateButton()).toBeInTheDocument();
   });
 
@@ -213,6 +214,31 @@ describe("Home komponent", () => {
     expect(screen.getByText("Wprowadz link")).toBeInTheDocument();
     await user.type(getInput(), "a");
     expect(screen.queryByText("Wprowadz link")).not.toBeInTheDocument();
+  });
+
+  it("usuwa poprzedni QR po walidacyjnym bledzie kolejnej proby", async () => {
+    render(<Home />);
+    await user.type(getInput(), "https://example.com");
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
+    });
+
+    await user.clear(getInput());
+    await user.type(getInput(), "nie-url");
+    await user.click(getGenerateButton());
+
+    expect(
+      screen.getByText("Wprowadz poprawny URL (np. https://example.com)")
+    ).toBeInTheDocument();
+    expect(screen.queryByAltText("Kod QR")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Kopiuj" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pobierz" })
+    ).not.toBeInTheDocument();
   });
 
   it("generuje QR dla poprawnego URL", async () => {
@@ -255,6 +281,35 @@ describe("Home komponent", () => {
 
     expect(screen.getByText("Generowanie...")).toBeInTheDocument();
     expect(getGenerateButton()).toBeDisabled();
+    expect(getInput()).toBeDisabled();
+
+    resolveToCanvas();
+    await waitFor(() => {
+      expect(screen.queryByText("Generowanie...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("nie rozpoczyna drugiego generowania podczas trwajacego requestu", async () => {
+    const { default: QRCode } = await import("qrcode");
+    vi.mocked(QRCode.toCanvas).mockClear();
+
+    let resolveToCanvas!: () => void;
+    vi.mocked(QRCode.toCanvas).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveToCanvas = resolve;
+        })
+    );
+
+    render(<Home />);
+    await user.type(getInput(), "https://example.com");
+    await user.click(getGenerateButton());
+
+    expect(QRCode.toCanvas).toHaveBeenCalledTimes(1);
+
+    fireEvent.submit(getGenerateButton().closest("form")!);
+
+    expect(QRCode.toCanvas).toHaveBeenCalledTimes(1);
 
     resolveToCanvas();
     await waitFor(() => {
@@ -282,7 +337,9 @@ describe("Home komponent", () => {
       expect(screen.getByText("Skopiowano!")).toBeInTheDocument();
     });
 
-    vi.advanceTimersByTime(2000);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Kopiuj")).toBeInTheDocument();
@@ -361,6 +418,37 @@ describe("Home komponent", () => {
         screen.getByText("Nie udalo sie wygenerowac kodu QR")
       ).toBeInTheDocument();
     });
+  });
+
+  it("usuwa poprzedni QR gdy ponowne generowanie zawiedzie", async () => {
+    const { default: QRCode } = await import("qrcode");
+
+    render(<Home />);
+    await user.type(getInput(), "https://example.com");
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
+    });
+
+    await user.clear(getInput());
+    await user.type(getInput(), "https://example.org");
+    vi.mocked(QRCode.toCanvas).mockRejectedValueOnce(new Error("QR error"));
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Nie udalo sie wygenerowac kodu QR")
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByAltText("Kod QR")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Kopiuj" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pobierz" })
+    ).not.toBeInTheDocument();
   });
 
   it("wyswietla dane kontaktowe autora", () => {

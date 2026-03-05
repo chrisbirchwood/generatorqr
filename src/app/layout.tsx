@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SITE_URL } from "./site";
 import "./globals.css";
 
 const inter = Inter({
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   title: "Generator kodów QR online - darmowy, szybki, bez rejestracji",
   description:
     "Wklej link i wygeneruj kod QR w sekundę. Skopiuj do schowka lub pobierz jako PNG. Darmowy, działa w przeglądarce, bez rejestracji.",
-  metadataBase: new URL("https://qr.birchcode.com"),
+  metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: "/",
   },
@@ -51,7 +52,7 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebApplication",
               name: "Generator kodów QR",
-              url: "https://generatorqr.vercel.app",
+              url: SITE_URL,
               description:
                 "Darmowy generator kodów QR online. Wklej link, wygeneruj QR i skopiuj do schowka.",
               applicationCategory: "UtilityApplication",
