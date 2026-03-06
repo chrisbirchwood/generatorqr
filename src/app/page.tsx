@@ -281,6 +281,14 @@ export default function Home() {
               krzysztof.brzezina@gmail.com
             </a>
           </p>
+          <p>
+            <a
+              href="/regulamin"
+              className="text-slate-400 hover:text-slate-500 transition-colors"
+            >
+              Regulamin i polityka prywatnosci
+            </a>
+          </p>
         </div>
       </div>
     </main>

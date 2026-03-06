@@ -51,7 +51,13 @@ export default function CookieBanner() {
       <div className="mx-auto max-w-md rounded-2xl bg-white shadow-lg shadow-slate-300/50 border border-slate-200 p-4 sm:p-5">
         <p className="text-sm text-slate-600 mb-4">
           Strona korzysta z analityki Vercel, aby mierzyc odwiedziny. Dane sa
-          anonimowe i nie sa udostepniane podmiotom trzecim.
+          anonimowe i nie sa udostepniane podmiotom trzecim.{" "}
+          <a
+            href="/regulamin"
+            className="text-blue-600 hover:text-blue-700 underline transition-colors"
+          >
+            Wiecej informacji
+          </a>
         </p>
         <div className="flex gap-3">
           <button
