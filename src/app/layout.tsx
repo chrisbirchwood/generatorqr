@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import { SITE_URL } from "./site";
+import AnalyticsProvider from "./components/AnalyticsProvider";
+import CookieBanner from "./components/CookieBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -72,7 +73,8 @@ export default function RootLayout({
           }}
         />
         {children}
-        <Analytics />
+        <CookieBanner />
+        <AnalyticsProvider />
       </body>
     </html>
   );
