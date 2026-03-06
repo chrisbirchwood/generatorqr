@@ -35,6 +35,11 @@ export function useCookieConsent() {
   return consent;
 }
 
+export function resetCookieConsent() {
+  localStorage.removeItem(CONSENT_KEY);
+  notifyListeners(null);
+}
+
 export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
 
@@ -42,6 +47,13 @@ export default function CookieBanner() {
     if (getStoredConsent() === null) {
       setVisible(true);
     }
+    const listener: ConsentListener = (status) => {
+      if (status === null) setVisible(true);
+    };
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }, []);
 
   const handleAccept = useCallback(() => {

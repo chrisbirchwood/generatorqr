@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import CookieBanner, { useCookieConsent } from "./CookieBanner";
+import CookieBanner, { useCookieConsent, resetCookieConsent } from "./CookieBanner";
 import AnalyticsProvider from "./AnalyticsProvider";
 
 // Mock Vercel Analytics i Speed Insights
@@ -176,5 +176,88 @@ describe("useCookieConsent + CookieBanner integracja", () => {
     localStorage.setItem("cookie-consent", "maybe");
     render(<ConsentStatus />);
     expect(screen.getByTestId("consent-status")).toHaveTextContent("null");
+  });
+});
+
+describe("resetCookieConsent", () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(() => {
+    user = userEvent.setup();
+    localStorage.clear();
+  });
+
+  it("resetuje zgodę i ponownie pokazuje banner", async () => {
+    localStorage.setItem("cookie-consent", "accepted");
+    render(
+      <>
+        <CookieBanner />
+        <AnalyticsProvider />
+      </>
+    );
+
+    // Skrypty działają, banner ukryty
+    expect(screen.getByTestId("vercel-analytics")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/korzysta z analityki Vercel/i)
+    ).not.toBeInTheDocument();
+
+    // Reset zgody
+    act(() => {
+      resetCookieConsent();
+    });
+
+    // Banner się pojawia, skrypty znikają
+    expect(
+      screen.getByText(/korzysta z analityki Vercel/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("vercel-analytics")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("vercel-speed-insights")
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem("cookie-consent")).toBeNull();
+  });
+
+  it("po resecie i ponownej akceptacji skrypty się ładują", async () => {
+    localStorage.setItem("cookie-consent", "accepted");
+    render(
+      <>
+        <CookieBanner />
+        <AnalyticsProvider />
+      </>
+    );
+
+    act(() => {
+      resetCookieConsent();
+    });
+
+    // Banner widoczny — klikamy Akceptuj ponownie
+    await user.click(screen.getByRole("button", { name: "Akceptuj" }));
+
+    expect(screen.getByTestId("vercel-analytics")).toBeInTheDocument();
+    expect(screen.getByTestId("vercel-speed-insights")).toBeInTheDocument();
+    expect(localStorage.getItem("cookie-consent")).toBe("accepted");
+  });
+
+  it("po resecie i odrzuceniu skrypty nie działają", async () => {
+    localStorage.setItem("cookie-consent", "accepted");
+    render(
+      <>
+        <CookieBanner />
+        <AnalyticsProvider />
+      </>
+    );
+
+    act(() => {
+      resetCookieConsent();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Odrzuć" }));
+
+    expect(screen.queryByTestId("vercel-analytics")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("vercel-speed-insights")
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem("cookie-consent")).toBe("rejected");
   });
 });

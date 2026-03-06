@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { resetCookieConsent } from "./components/CookieBanner";
 
 const URL_INPUT_ID = "qr-url";
 const URL_ERROR_ID = "qr-url-error";
@@ -281,13 +282,20 @@ export default function Home() {
               krzysztof.brzezina@gmail.com
             </a>
           </p>
-          <p>
+          <p className="space-x-2">
             <a
               href="/regulamin"
               className="text-slate-400 hover:text-slate-500 transition-colors"
             >
               Regulamin i polityka prywatności
             </a>
+            <span className="text-slate-300">|</span>
+            <button
+              onClick={resetCookieConsent}
+              className="text-slate-400 hover:text-slate-500 transition-colors cursor-pointer"
+            >
+              Ustawienia cookies
+            </button>
           </p>
         </div>
       </div>
