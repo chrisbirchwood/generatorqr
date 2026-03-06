@@ -286,7 +286,7 @@ export default function Home() {
               href="/regulamin"
               className="text-slate-400 hover:text-slate-500 transition-colors"
             >
-              Regulamin i polityka prywatnosci
+              Regulamin i polityka prywatności
             </a>
           </p>
         </div>

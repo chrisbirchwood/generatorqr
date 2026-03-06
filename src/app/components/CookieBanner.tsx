@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const CONSENT_KEY = "cookie-consent";
 
@@ -13,11 +13,23 @@ function getStoredConsent(): ConsentStatus {
   return null;
 }
 
+type ConsentListener = (status: ConsentStatus) => void;
+const listeners = new Set<ConsentListener>();
+
+function notifyListeners(status: ConsentStatus) {
+  listeners.forEach((fn) => fn(status));
+}
+
 export function useCookieConsent() {
   const [consent, setConsent] = useState<ConsentStatus>(null);
 
   useEffect(() => {
     setConsent(getStoredConsent());
+    const listener: ConsentListener = (status) => setConsent(status);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }, []);
 
   return consent;
@@ -32,17 +44,17 @@ export default function CookieBanner() {
     }
   }, []);
 
-  const handleAccept = () => {
+  const handleAccept = useCallback(() => {
     localStorage.setItem(CONSENT_KEY, "accepted");
     setVisible(false);
-    // Przeladowanie strony zeby zaladowac skrypty analityczne
-    window.location.reload();
-  };
+    notifyListeners("accepted");
+  }, []);
 
-  const handleReject = () => {
+  const handleReject = useCallback(() => {
     localStorage.setItem(CONSENT_KEY, "rejected");
     setVisible(false);
-  };
+    notifyListeners("rejected");
+  }, []);
 
   if (!visible) return null;
 
@@ -50,13 +62,13 @@ export default function CookieBanner() {
     <div className="fixed bottom-0 left-0 right-0 z-50 p-4">
       <div className="mx-auto max-w-md rounded-2xl bg-white shadow-lg shadow-slate-300/50 border border-slate-200 p-4 sm:p-5">
         <p className="text-sm text-slate-600 mb-4">
-          Strona korzysta z analityki Vercel, aby mierzyc odwiedziny. Dane sa
-          anonimowe i nie sa udostepniane podmiotom trzecim.{" "}
+          Strona korzysta z analityki Vercel, aby mierzyć odwiedziny. Dane są
+          anonimowe i nie są udostępniane podmiotom trzecim.{" "}
           <a
             href="/regulamin"
             className="text-blue-600 hover:text-blue-700 underline transition-colors"
           >
-            Wiecej informacji
+            Więcej informacji
           </a>
         </p>
         <div className="flex gap-3">
@@ -64,7 +76,7 @@ export default function CookieBanner() {
             onClick={handleReject}
             className="flex-1 py-2.5 px-4 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 border border-slate-200 transition-colors cursor-pointer"
           >
-            Odrzuc
+            Odrzuć
           </button>
           <button
             onClick={handleAccept}
