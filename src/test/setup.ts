@@ -38,6 +38,7 @@ HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
   closePath: vi.fn(),
   moveTo: vi.fn(),
   lineTo: vi.fn(),
+  quadraticCurveTo: vi.fn(),
   clip: vi.fn(),
   stroke: vi.fn(),
   fill: vi.fn(),

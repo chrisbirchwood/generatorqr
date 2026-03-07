@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { SITE_URL } from "./site";
 import AnalyticsProvider from "./components/AnalyticsProvider";
 import CookieBanner from "./components/CookieBanner";
+import { ThemeProvider } from "./components/ThemeProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -45,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pl">
+    <html lang="pl" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`}>
         <script
           type="application/ld+json"
@@ -72,9 +73,16 @@ export default function RootLayout({
             }),
           }}
         />
-        {children}
-        <CookieBanner />
-        <AnalyticsProvider />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <CookieBanner />
+          <AnalyticsProvider />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@variant dark (&:is(.dark *));
+
 @theme inline {
   --font-sans: var(--font-inter);
+  --color-gold-400: #d4af37;
+  --color-gold-500: #b89b2b;
+  --color-gold-600: #998020;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
 }

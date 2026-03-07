@@ -24,6 +24,7 @@ export function useCookieConsent() {
   const [consent, setConsent] = useState<ConsentStatus>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConsent(getStoredConsent());
     const listener: ConsentListener = (status) => setConsent(status);
     listeners.add(listener);
@@ -45,6 +46,7 @@ export default function CookieBanner() {
 
   useEffect(() => {
     if (getStoredConsent() === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
     }
     const listener: ConsentListener = (status) => {
