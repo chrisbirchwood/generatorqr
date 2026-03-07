@@ -973,9 +973,9 @@ export default function Home() {
           </div>
 
           {/* Footer links under controls */}
-          <div className="text-zinc-500 dark:text-zinc-500 text-[11px] mt-6 space-y-1.5 text-center lg:text-left transition-colors">
+          <div className="text-zinc-500 dark:text-zinc-500 text-[11px] mt-6 space-y-1.5 text-center transition-colors">
             <p>Kody generowane lokalnie.</p>
-            <p className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-1 sm:gap-2">
+            <p className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
               <span>Stworzone przez <span className="text-zinc-700 dark:text-zinc-400 font-medium">Krzysztof Brzezina</span></span>
               <span className="hidden sm:inline text-zinc-300 dark:text-zinc-700">|</span>
               <a
