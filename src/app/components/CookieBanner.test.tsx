@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CookieBanner, { useCookieConsent, resetCookieConsent } from "./CookieBanner";
 import AnalyticsProvider from "./AnalyticsProvider";
+import { I18nProvider } from "../i18n";
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(<I18nProvider>{ui}</I18nProvider>);
+}
 
 // Mock Vercel Analytics i Speed Insights
 vi.mock("@vercel/analytics/react", () => ({
@@ -28,7 +33,7 @@ describe("CookieBanner", () => {
   });
 
   it("wyświetla banner gdy brak zapisanej zgody", () => {
-    render(<CookieBanner />);
+    renderWithI18n(<CookieBanner />);
     expect(
       screen.getByText(/korzysta z analityki Vercel/i)
     ).toBeInTheDocument();
@@ -38,7 +43,7 @@ describe("CookieBanner", () => {
 
   it("nie wyświetla bannera gdy zgoda już zaakceptowana", () => {
     localStorage.setItem("cookie-consent", "accepted");
-    render(<CookieBanner />);
+    renderWithI18n(<CookieBanner />);
     expect(
       screen.queryByText(/korzysta z analityki Vercel/i)
     ).not.toBeInTheDocument();
@@ -46,14 +51,14 @@ describe("CookieBanner", () => {
 
   it("nie wyświetla bannera gdy zgoda już odrzucona", () => {
     localStorage.setItem("cookie-consent", "rejected");
-    render(<CookieBanner />);
+    renderWithI18n(<CookieBanner />);
     expect(
       screen.queryByText(/korzysta z analityki Vercel/i)
     ).not.toBeInTheDocument();
   });
 
   it("zapisuje akceptację i ukrywa banner po kliknięciu Akceptuj", async () => {
-    render(<CookieBanner />);
+    renderWithI18n(<CookieBanner />);
     await user.click(screen.getByRole("button", { name: "Akceptuj" }));
 
     expect(localStorage.getItem("cookie-consent")).toBe("accepted");
@@ -63,7 +68,7 @@ describe("CookieBanner", () => {
   });
 
   it("zapisuje odrzucenie i ukrywa banner po kliknięciu Odrzuć", async () => {
-    render(<CookieBanner />);
+    renderWithI18n(<CookieBanner />);
     await user.click(screen.getByRole("button", { name: "Odrzuć" }));
 
     expect(localStorage.getItem("cookie-consent")).toBe("rejected");
@@ -73,7 +78,7 @@ describe("CookieBanner", () => {
   });
 
   it("zawiera link do regulaminu", () => {
-    render(<CookieBanner />);
+    renderWithI18n(<CookieBanner />);
     const link = screen.getByText("Więcej informacji");
     expect(link).toHaveAttribute("href", "/regulamin");
   });
@@ -119,10 +124,10 @@ describe("useCookieConsent + CookieBanner integracja", () => {
 
   it("AnalyticsProvider reaguje na akceptację bez przeładowania strony", async () => {
     render(
-      <>
+      <I18nProvider>
         <CookieBanner />
         <AnalyticsProvider />
-      </>
+      </I18nProvider>
     );
 
     // Przed akceptacją — brak skryptów
@@ -141,10 +146,10 @@ describe("useCookieConsent + CookieBanner integracja", () => {
 
   it("AnalyticsProvider nie reaguje na odrzucenie", async () => {
     render(
-      <>
+      <I18nProvider>
         <CookieBanner />
         <AnalyticsProvider />
-      </>
+      </I18nProvider>
     );
 
     await user.click(screen.getByRole("button", { name: "Odrzuć" }));
@@ -190,10 +195,10 @@ describe("resetCookieConsent", () => {
   it("resetuje zgodę i ponownie pokazuje banner", async () => {
     localStorage.setItem("cookie-consent", "accepted");
     render(
-      <>
+      <I18nProvider>
         <CookieBanner />
         <AnalyticsProvider />
-      </>
+      </I18nProvider>
     );
 
     // Skrypty działają, banner ukryty
@@ -221,10 +226,10 @@ describe("resetCookieConsent", () => {
   it("po resecie i ponownej akceptacji skrypty się ładują", async () => {
     localStorage.setItem("cookie-consent", "accepted");
     render(
-      <>
+      <I18nProvider>
         <CookieBanner />
         <AnalyticsProvider />
-      </>
+      </I18nProvider>
     );
 
     act(() => {
@@ -242,10 +247,10 @@ describe("resetCookieConsent", () => {
   it("po resecie i odrzuceniu skrypty nie działają", async () => {
     localStorage.setItem("cookie-consent", "accepted");
     render(
-      <>
+      <I18nProvider>
         <CookieBanner />
         <AnalyticsProvider />
-      </>
+      </I18nProvider>
     );
 
     act(() => {

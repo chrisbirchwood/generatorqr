@@ -4,6 +4,7 @@ import { SITE_URL } from "./site";
 import AnalyticsProvider from "./components/AnalyticsProvider";
 import CookieBanner from "./components/CookieBanner";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { I18nProvider } from "./i18n";
 import "./globals.css";
 
 const inter = Inter({
@@ -79,9 +80,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <CookieBanner />
-          <AnalyticsProvider />
+          <I18nProvider>
+            {children}
+            <CookieBanner />
+            <AnalyticsProvider />
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

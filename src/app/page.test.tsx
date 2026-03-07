@@ -6,15 +6,36 @@ import {
   generateQRToCanvas,
   generateQRToSVG,
 } from "./qr-renderer";
+import { I18nProvider } from "./i18n";
 import Home, {
   copyCanvasToClipboard,
   downloadDataUrl,
   downloadSvgString,
+  drawLogoOnCanvas,
   injectLogoIntoSvg,
+  loadImage,
   presetLogoToDataUrl,
   validateInput,
   formatQrData,
 } from "./page";
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(<I18nProvider>{ui}</I18nProvider>);
+}
+
+const mockSetTheme = vi.fn();
+let mockTheme = "system";
+vi.mock("next-themes", () => ({
+  useTheme: () => ({
+    theme: mockTheme,
+    setTheme: mockSetTheme,
+    themes: ["light", "dark", "system"],
+    resolvedTheme: mockTheme === "system" ? "light" : mockTheme,
+    systemTheme: "light",
+    forcedTheme: undefined,
+  }),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 vi.mock("./qr-renderer", async () => {
   const actual = await vi.importActual<typeof import("./qr-renderer")>(
@@ -35,46 +56,46 @@ vi.mock("./qr-renderer", async () => {
 });
 
 function getInput() {
-  return screen.getByRole("textbox", { name: /link|telefon|e-mail|whatsapp|telegram|signal|tekst|dane do zakodowania/i });
+  return screen.getByRole("textbox", { name: /link|telefon|phone|e-mail|whatsapp|telegram|signal|tekst|text|dane do zakodowania|data to encode/i });
 }
 
 function getGenerateButton() {
-  return screen.getByRole("button", { name: /generuj|generowanie/i });
+  return screen.getByRole("button", { name: /generuj|generowanie|generate|generating/i });
 }
 
 describe("validateInput (url)", () => {
   it("zwraca blad dla pustego stringa", () => {
     expect(validateInput("", "url")).toEqual({
       valid: false,
-      error: "To pole nie może być puste",
+      error: "error.empty",
     });
   });
 
   it("zwraca blad dla samych spacji", () => {
     expect(validateInput("   ", "url")).toEqual({
       valid: false,
-      error: "To pole nie może być puste",
+      error: "error.empty",
     });
   });
 
   it("zwraca blad dla niepoprawnego URL", () => {
     expect(validateInput("nie-url", "url")).toEqual({
       valid: false,
-      error: "Wprowadź poprawny URL (np. https://example.com)",
+      error: "error.invalidUrl",
     });
   });
 
   it("zwraca blad dla protokolu javascript:", () => {
     expect(validateInput("javascript:alert(1)", "url")).toEqual({
       valid: false,
-      error: "Dozwolone są tylko linki http:// i https://",
+      error: "error.invalidProtocol",
     });
   });
 
   it("zwraca blad dla protokolu ftp:", () => {
     expect(validateInput("ftp://example.com", "url")).toEqual({
       valid: false,
-      error: "Dozwolone są tylko linki http:// i https://",
+      error: "error.invalidProtocol",
     });
   });
 
@@ -95,12 +116,22 @@ describe("validateInput (email)", () => {
   it("zwraca blad dla niepoprawnego emaila", () => {
     expect(validateInput("jan.kowalski", "email")).toEqual({
       valid: false,
-      error: "Wprowadź poprawny adres e-mail",
+      error: "error.invalidEmail",
     });
   });
 
   it("akceptuje poprawny email", () => {
     expect(validateInput("jan@example.com", "email")).toEqual({ valid: true });
+  });
+});
+
+describe("validateInput (inne typy)", () => {
+  it("akceptuje niepusty tekst dla typu phone", () => {
+    expect(validateInput("+48123456789", "phone")).toEqual({ valid: true });
+  });
+
+  it("zwraca blad dla pustego pola w typie text", () => {
+    expect(validateInput("", "text")).toEqual({ valid: false, error: "error.empty" });
   });
 });
 
@@ -246,6 +277,13 @@ describe("presetLogoToDataUrl", () => {
     expect(decodedSvg).toContain('fill="#FFFFFF"');
   });
 
+  it("tworzy monochromatyczny wariant z domyslnymi kolorami", () => {
+    const dataUrl = presetLogoToDataUrl("whatsapp", { variant: "monochrome" });
+    const decodedSvg = atob(dataUrl.replace("data:image/svg+xml;base64,", ""));
+    expect(decodedSvg).toContain(`fill="${DEFAULT_QR_APPEARANCE.darkColor}"`);
+    expect(decodedSvg).toContain(`fill="${DEFAULT_QR_APPEARANCE.lightColor}"`);
+  });
+
   it("tworzy monochromatyczny wariant w kolorach QR", () => {
     const dataUrl = presetLogoToDataUrl("telegram", {
       variant: "monochrome",
@@ -257,6 +295,42 @@ describe("presetLogoToDataUrl", () => {
 
     expect(decodedSvg).toContain('fill="#112233"');
     expect(decodedSvg).toContain('fill="#FAFAFA"');
+  });
+});
+
+describe("loadImage", () => {
+  it("odrzuca promise gdy obraz nie moze byc zaladowany", async () => {
+    const OriginalImage = window.Image;
+    Object.defineProperty(window, "Image", {
+      configurable: true,
+      writable: true,
+      value: class MockImage {
+        onload: null | (() => void) = null;
+        onerror: null | (() => void) = null;
+        set src(_value: string) { this.onerror?.(); }
+      },
+    });
+
+    await expect(loadImage("invalid://url")).rejects.toThrow("Nie udalo sie zaladowac obrazka");
+
+    Object.defineProperty(window, "Image", {
+      configurable: true,
+      writable: true,
+      value: OriginalImage,
+    });
+  });
+});
+
+describe("drawLogoOnCanvas", () => {
+  it("nie rysuje nic gdy brak kontekstu 2d", () => {
+    const canvas = document.createElement("canvas");
+    const origGetContext = canvas.getContext.bind(canvas);
+    canvas.getContext = (() => null) as typeof canvas.getContext;
+
+    const img = new Image();
+    // Nie powinno rzucic bledu
+    expect(() => drawLogoOnCanvas(canvas, img)).not.toThrow();
+    canvas.getContext = origGetContext;
   });
 });
 
@@ -297,7 +371,7 @@ describe("Home komponent", () => {
   });
 
   it("renderuje formularz z inputem i przyciskiem", () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.getByText("Generator QR")).toBeInTheDocument();
     expect(getInput()).toBeInTheDocument();
     expect(getInput()).toHaveAccessibleName("Link");
@@ -305,14 +379,14 @@ describe("Home komponent", () => {
   });
 
   it("w trybie podstawowym nie pokazuje ustawien zaawansowanych", () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.queryByText("Styl modulu QR")).not.toBeInTheDocument();
     expect(screen.queryByText("Kolor kodu QR")).not.toBeInTheDocument();
     expect(screen.queryByText("Kolor tla")).not.toBeInTheDocument();
   });
 
   it("pokazuje ustawienia stylu i kolorow dopiero w trybie zaawansowanym", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
 
     expect(screen.getByText("Styl modulu QR")).toBeInTheDocument();
@@ -336,7 +410,7 @@ describe("Home komponent", () => {
   });
 
   it("przekazuje wybrany styl i kolory tylko w trybie zaawansowanym", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     fireEvent.change(screen.getByLabelText(/wybierz kolor kodu qr/i), {
@@ -390,7 +464,7 @@ describe("Home komponent", () => {
     });
 
     try {
-      render(<Home />);
+      renderWithProviders(<Home />);
 
       await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
       await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
@@ -419,8 +493,26 @@ describe("Home komponent", () => {
     }
   });
 
+  it("pozwala wpisac kolor hex w polu tekstowym", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
+
+    // Znajdz pole tekstowe hex (obok color pickera)
+    const hexInputs = screen.getAllByRole("textbox").filter(
+      (el) => el.getAttribute("maxlength") === "6"
+    );
+    expect(hexInputs.length).toBeGreaterThan(0);
+
+    const hexInput = hexInputs[0];
+    await user.clear(hexInput);
+    await user.type(hexInput, "FF0000");
+
+    // Pole filtruje tylko znaki hex i ustawia uppercase
+    expect(hexInput).toHaveDisplayValue(/^[0-9A-F]{3,6}$/);
+  });
+
   it("w trybie mono kafelki presetow przyjmuja kolory z ustawien QR", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     fireEvent.change(screen.getByLabelText(/wybierz kolor kodu qr/i), {
@@ -439,7 +531,7 @@ describe("Home komponent", () => {
   });
 
   it("w trybie podstawowym ignoruje wczesniej ustawione opcje zaawansowane", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     fireEvent.change(screen.getByLabelText(/wybierz kolor kodu qr/i), {
@@ -468,39 +560,39 @@ describe("Home komponent", () => {
   });
 
   it("wyswietla blad walidacji dla pustego pola", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(getGenerateButton());
-    expect(screen.getByText("To pole nie może być puste")).toBeInTheDocument();
+    expect(screen.getByText(/pole.*puste|cannot be empty/i)).toBeInTheDocument();
   });
 
   it("wyswietla blad walidacji dla niepoprawnego URL", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "nie-url");
     await user.click(getGenerateButton());
     expect(
-      screen.getByText("Wprowadź poprawny URL (np. https://example.com)")
+      screen.getByText(/poprawny URL|valid URL/i)
     ).toBeInTheDocument();
   });
 
   it("wyswietla blad dla zablokowanego protokolu", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "ftp://example.com");
     await user.click(getGenerateButton());
     expect(
-      screen.getByText("Dozwolone są tylko linki http:// i https://")
+      screen.getByText(/dozwolone.*http|only.*http/i)
     ).toBeInTheDocument();
   });
 
   it("czysci blad przy wpisywaniu", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(getGenerateButton());
-    expect(screen.getByText("To pole nie może być puste")).toBeInTheDocument();
+    expect(screen.getByText(/pole.*puste|cannot be empty/i)).toBeInTheDocument();
     await user.type(getInput(), "a");
-    expect(screen.queryByText("To pole nie może być puste")).not.toBeInTheDocument();
+    expect(screen.queryByText(/pole.*puste|cannot be empty/i)).not.toBeInTheDocument();
   });
 
   it("usuwa poprzedni QR po walidacyjnym bledzie kolejnej proby", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -513,7 +605,7 @@ describe("Home komponent", () => {
     await user.click(getGenerateButton());
 
     expect(
-      screen.getByText("Wprowadź poprawny URL (np. https://example.com)")
+      screen.getByText(/poprawny URL|valid URL/i)
     ).toBeInTheDocument();
     expect(screen.queryByAltText("Twój Luksusowy Kod QR")).not.toBeInTheDocument();
     expect(
@@ -528,7 +620,7 @@ describe("Home komponent", () => {
   });
 
   it("generuje QR dla poprawnego URL", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -547,7 +639,7 @@ describe("Home komponent", () => {
   });
 
   it("generuje QR po Enter", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.keyboard("{Enter}");
 
@@ -565,7 +657,7 @@ describe("Home komponent", () => {
         })
     );
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -588,7 +680,7 @@ describe("Home komponent", () => {
         })
     );
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -610,7 +702,7 @@ describe("Home komponent", () => {
       advanceTimers: vi.advanceTimersByTime,
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await timerUser.type(getInput(), "https://example.com");
     await timerUser.click(getGenerateButton());
 
@@ -658,7 +750,7 @@ describe("Home komponent", () => {
       return element;
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -684,7 +776,7 @@ describe("Home komponent", () => {
       return element;
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -707,7 +799,7 @@ describe("Home komponent", () => {
       return element;
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -722,19 +814,19 @@ describe("Home komponent", () => {
   it("wyswietla blad gdy generowanie zawiedzie", async () => {
     vi.mocked(generateQRToCanvas).mockRejectedValueOnce(new Error("QR error"));
 
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
     await waitFor(() => {
       expect(
-        screen.getByText("Nie udalo sie wygenerowac kodu QR")
+        screen.getByText(/wygenerowac|failed to generate/i)
       ).toBeInTheDocument();
     });
   });
 
   it("usuwa poprzedni QR gdy ponowne generowanie zawiedzie", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.type(getInput(), "https://example.com");
     await user.click(getGenerateButton());
 
@@ -749,7 +841,7 @@ describe("Home komponent", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Nie udalo sie wygenerowac kodu QR")
+        screen.getByText(/wygenerowac|failed to generate/i)
       ).toBeInTheDocument();
     });
 
@@ -762,7 +854,7 @@ describe("Home komponent", () => {
   });
 
   it("wyswietla dane kontaktowe autora", () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.getByText("Krzysztof Brzezina")).toBeInTheDocument();
     expect(screen.getByText("WhatsApp 517 466 553")).toHaveAttribute(
       "href",
@@ -775,7 +867,7 @@ describe("Home komponent", () => {
   });
 
   it("nie pokazuje przyciskow akcji bez QR", () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     expect(
       screen.queryByText("Skopiuj")
     ).not.toBeInTheDocument();
@@ -784,18 +876,18 @@ describe("Home komponent", () => {
   });
 
   it("renderuje zakladki Podstawowy i Z logotypem", () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.getByRole("tab", { name: /podstawowy/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /z logotypem/i })).toBeInTheDocument();
   });
 
   it("domyslnie nie pokazuje wyboru logo", () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.queryByText(/logo w centrum/i)).not.toBeInTheDocument();
   });
 
   it("pokazuje wybor logo po kliknieciu zakladki Z logotypem", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     expect(screen.getByText(/logo w centrum/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /logo whatsapp/i })).toBeInTheDocument();
@@ -812,7 +904,7 @@ describe("Home komponent", () => {
   });
 
   it("ukrywa wybor logo po powrocie na zakladke Podstawowy", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     expect(screen.getByText(/logo w centrum/i)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: /podstawowy/i }));
@@ -820,14 +912,14 @@ describe("Home komponent", () => {
   });
 
   it("pozwala wybrac preset logo i pokazuje przycisk Usun", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
     expect(screen.getByText(/usun logo/i)).toBeInTheDocument();
   });
 
   it("pozwala odznaczac preset logo klikajac ponownie", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
     expect(screen.getByText(/usun logo/i)).toBeInTheDocument();
@@ -836,8 +928,319 @@ describe("Home komponent", () => {
   });
 
   it("renderuje przelacznik motywu po zamontowaniu obiektu", async () => {
-    render(<Home />);
+    renderWithProviders(<Home />);
     const themeBtn = await screen.findByRole("button", { name: /przełącz motyw/i });
     expect(themeBtn).toBeInTheDocument();
+  });
+
+  it("przelacza motyw z dark na light", async () => {
+    mockTheme = "dark";
+    mockSetTheme.mockClear();
+
+    renderWithProviders(<Home />);
+    const themeBtn = await screen.findByRole("button", { name: /przełącz motyw/i });
+    await user.click(themeBtn);
+    expect(mockSetTheme).toHaveBeenCalledWith("light");
+
+    mockTheme = "system";
+  });
+
+  it("przelacza motyw z light na dark", async () => {
+    mockTheme = "light";
+    mockSetTheme.mockClear();
+
+    renderWithProviders(<Home />);
+    const themeBtn = await screen.findByRole("button", { name: /przełącz motyw/i });
+    await user.click(themeBtn);
+    expect(mockSetTheme).toHaveBeenCalledWith("dark");
+
+    mockTheme = "system";
+  });
+
+  it("zmienia typ QR po kliknieciu przycisku typu", async () => {
+    renderWithProviders(<Home />);
+    const phoneButton = screen.getByRole("button", { name: "Telefon" });
+    await user.click(phoneButton);
+    expect(getInput()).toHaveAccessibleName("Telefon");
+    expect(getInput()).toHaveValue("");
+  });
+
+  it("zmienia typ QR na email i ustawia odpowiedni placeholder", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: "E-mail" }));
+    expect(getInput()).toHaveAccessibleName("E-mail");
+    expect(getInput()).toHaveAttribute("placeholder", "kontakt@example.com");
+  });
+
+  it("czyści url i blad przy zmianie typu QR", async () => {
+    renderWithProviders(<Home />);
+    await user.type(getInput(), "nie-url");
+    await user.click(getGenerateButton());
+    expect(screen.getByText(/poprawny URL|valid URL/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Telefon" }));
+    expect(getInput()).toHaveValue("");
+    expect(screen.queryByText(/poprawny URL|valid URL/i)).not.toBeInTheDocument();
+  });
+
+  it("obsluguje wgrywanie wlasnego logo", async () => {
+    const OriginalFileReader = window.FileReader;
+    let capturedOnload: (() => void) | null = null;
+    const mockReadAsDataURL = vi.fn();
+
+    Object.defineProperty(window, "FileReader", {
+      configurable: true,
+      writable: true,
+      value: class MockFileReader {
+        onload: (() => void) | null = null;
+        result = "data:image/png;base64,customlogo";
+        readAsDataURL = (...args: Parameters<typeof mockReadAsDataURL>) => {
+          mockReadAsDataURL(...args);
+          capturedOnload = this.onload;
+        };
+      },
+    });
+
+    try {
+      renderWithProviders(<Home />);
+      await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
+
+      const fileInput = screen.getByLabelText(/wgraj wlasne logo/i);
+      const file = new File(["png-data"], "logo.png", { type: "image/png" });
+
+      fireEvent.change(fileInput, { target: { files: [file] } });
+      expect(mockReadAsDataURL).toHaveBeenCalledWith(file);
+
+      act(() => { capturedOnload?.(); });
+
+      expect(screen.getByText(/usun logo/i)).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "FileReader", {
+        configurable: true,
+        writable: true,
+        value: OriginalFileReader,
+      });
+    }
+  });
+
+  it("ignoruje puste wgranie pliku", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
+
+    const fileInput = screen.getByLabelText(/wgraj wlasne logo/i);
+    fireEvent.change(fileInput, { target: { files: [] } });
+
+    // Nie powinien pojawic sie przycisk usun logo
+    expect(screen.queryByText(/usun logo/i)).not.toBeInTheDocument();
+  });
+
+  it("klika ukryty input pliku po kliknieciu przycisku upload", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
+
+    const fileInput = screen.getByLabelText(/wgraj wlasne logo/i) as HTMLInputElement;
+    const clickSpy = vi.spyOn(fileInput, "click");
+
+    const uploadButton = screen.getByRole("button", { name: /wgraj wlasne logo/i });
+    await user.click(uploadButton);
+
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("usuwa wlasne logo po kliknieciu Usun logo (custom)", async () => {
+    const OriginalFileReader = window.FileReader;
+    let capturedOnload: (() => void) | null = null;
+
+    Object.defineProperty(window, "FileReader", {
+      configurable: true,
+      writable: true,
+      value: class MockFileReader {
+        onload: (() => void) | null = null;
+        result = "data:image/png;base64,test";
+        readAsDataURL = () => { capturedOnload = this.onload; };
+      },
+    });
+
+    try {
+      renderWithProviders(<Home />);
+      await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
+
+      const fileInput = screen.getByLabelText(/wgraj wlasne logo/i);
+      const file = new File(["png"], "logo.png", { type: "image/png" });
+      fireEvent.change(fileInput, { target: { files: [file] } });
+      act(() => { capturedOnload?.(); });
+
+      expect(screen.getByText(/usun logo/i)).toBeInTheDocument();
+
+      await user.click(screen.getByText(/usun logo/i));
+      expect(screen.queryByText(/usun logo/i)).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "FileReader", {
+        configurable: true,
+        writable: true,
+        value: OriginalFileReader,
+      });
+    }
+  });
+
+  it("czysci timeout kopiowania przy odmontowaniu", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const timerUser = userEvent.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+
+    const { unmount } = renderWithProviders(<Home />);
+    await timerUser.type(getInput(), "https://example.com");
+    await timerUser.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(screen.getByAltText("Twój Luksusowy Kod QR")).toBeInTheDocument();
+    });
+
+    await timerUser.click(
+      screen.getByText("Skopiuj").closest("button") as HTMLElement
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /skopiowano/i })).toBeInTheDocument();
+    });
+
+    // Odmontuj z aktywnym timeoutem - test pokrywa cleanup effect
+    unmount();
+    vi.useRealTimers();
+  });
+
+  it("resetuje timeout kopiowania przy ponownym kopiowaniu", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const timerUser = userEvent.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+
+    renderWithProviders(<Home />);
+    await timerUser.type(getInput(), "https://example.com");
+    await timerUser.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(screen.getByAltText("Twój Luksusowy Kod QR")).toBeInTheDocument();
+    });
+
+    // Pierwsze kopiowanie
+    await timerUser.click(
+      screen.getByText("Skopiuj").closest("button") as HTMLElement
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /skopiowano/i })).toBeInTheDocument();
+    });
+
+    // Drugie kopiowanie przed uplywem 2s - pokrywa clearCopyResetTimeout branch
+    await timerUser.click(
+      screen.getByRole("button", { name: /skopiowano/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /skopiowano/i })).toBeInTheDocument();
+    });
+
+    act(() => { vi.advanceTimersByTime(2000); });
+
+    await waitFor(() => {
+      expect(screen.getByText("Skopiuj").closest("button")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("wyswietla placeholder w panelu wynikow przed generowaniem", () => {
+    renderWithProviders(<Home />);
+    expect(screen.getByText("Miejsce na Twój Kod QR")).toBeInTheDocument();
+  });
+
+  it("po generowaniu wyswietla przycisk powrotu do edycji", async () => {
+    renderWithProviders(<Home />);
+    await user.type(getInput(), "https://example.com");
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(screen.getByAltText("Twój Luksusowy Kod QR")).toBeInTheDocument();
+    });
+
+    const backButton = screen.getByText(/edytuj projekt/i).closest("button");
+    expect(backButton).toBeInTheDocument();
+
+    await user.click(backButton!);
+
+    // Po kliknieciu powrotu formularz jest widoczny
+    expect(getInput()).toBeInTheDocument();
+  });
+
+  it("generuje QR z wlasnym logo w trybie zaawansowanym", async () => {
+    const OriginalImage = window.Image;
+    const OriginalFileReader = window.FileReader;
+    let capturedOnload: (() => void) | null = null;
+
+    Object.defineProperty(window, "Image", {
+      configurable: true,
+      writable: true,
+      value: class MockImage {
+        onload: null | (() => void) = null;
+        onerror: null | (() => void) = null;
+        set src(_value: string) { this.onload?.(); }
+      },
+    });
+
+    Object.defineProperty(window, "FileReader", {
+      configurable: true,
+      writable: true,
+      value: class MockFileReader {
+        onload: (() => void) | null = null;
+        result = "data:image/png;base64,customlogo";
+        readAsDataURL = () => { capturedOnload = this.onload; };
+      },
+    });
+
+    // Mock canvas getContext zeby drawLogoOnCanvas mogl narysowac logo
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    const noop = vi.fn();
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+      beginPath: noop, moveTo: noop, lineTo: noop, arcTo: noop,
+      quadraticCurveTo: noop, closePath: noop, clip: noop, fill: noop,
+      drawImage: noop, save: noop, restore: noop, fillRect: noop,
+      fillStyle: "",
+    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+
+    try {
+      renderWithProviders(<Home />);
+      await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
+
+      const fileInput = screen.getByLabelText(/wgraj wlasne logo/i);
+      const file = new File(["png"], "logo.png", { type: "image/png" });
+      fireEvent.change(fileInput, { target: { files: [file] } });
+      act(() => { capturedOnload?.(); });
+
+      await user.type(getInput(), "https://example.com");
+      await user.click(getGenerateButton());
+
+      await waitFor(() => {
+        expect(screen.getByAltText("Twój Luksusowy Kod QR")).toBeInTheDocument();
+      });
+
+      expect(generateQRToCanvas).toHaveBeenCalledWith(
+        expect.any(HTMLCanvasElement),
+        "https://example.com",
+        expect.objectContaining({ errorCorrectionLevel: "H" })
+      );
+    } finally {
+      Object.defineProperty(window, "Image", {
+        configurable: true,
+        writable: true,
+        value: OriginalImage,
+      });
+      Object.defineProperty(window, "FileReader", {
+        configurable: true,
+        writable: true,
+        value: OriginalFileReader,
+      });
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
   });
 });

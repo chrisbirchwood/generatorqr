@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
 import { resetCookieConsent } from "./components/CookieBanner";
+import { useI18n, LanguageSwitcher, type TranslationKey } from "./i18n";
 import {
   DEFAULT_QR_APPEARANCE,
   QR_STYLE_OPTIONS,
@@ -30,14 +31,14 @@ type PresetLogo =
 
 export type QrDataType = "url" | "phone" | "email" | "whatsapp" | "telegram" | "signal" | "text";
 
-export const QR_TYPES: { value: QrDataType; label: string; placeholder: string; type: string }[] = [
-  { value: "url", label: "Link", placeholder: "https://example.com", type: "url" },
-  { value: "phone", label: "Telefon", placeholder: "+48 123 456 789", type: "tel" },
-  { value: "email", label: "E-mail", placeholder: "kontakt@example.com", type: "email" },
-  { value: "whatsapp", label: "WhatsApp", placeholder: "+48 123 456 789", type: "tel" },
-  { value: "telegram", label: "Telegram", placeholder: "+48 123 456 789", type: "tel" },
-  { value: "signal", label: "Signal", placeholder: "+48 123 456 789", type: "tel" },
-  { value: "text", label: "Tekst", placeholder: "Wpisz dowolny tekst...", type: "text" },
+export const QR_TYPES: { value: QrDataType; labelKey: TranslationKey; placeholderKey?: TranslationKey; defaultPlaceholder?: string; type: string }[] = [
+  { value: "url", labelKey: "qrType.url", defaultPlaceholder: "https://example.com", type: "url" },
+  { value: "phone", labelKey: "qrType.phone", defaultPlaceholder: "+48 123 456 789", type: "tel" },
+  { value: "email", labelKey: "qrType.email", placeholderKey: "qrTypePlaceholder.email", type: "email" },
+  { value: "whatsapp", labelKey: "qrType.whatsapp", defaultPlaceholder: "+48 123 456 789", type: "tel" },
+  { value: "telegram", labelKey: "qrType.telegram", defaultPlaceholder: "+48 123 456 789", type: "tel" },
+  { value: "signal", labelKey: "qrType.signal", defaultPlaceholder: "+48 123 456 789", type: "tel" },
+  { value: "text", labelKey: "qrType.text", placeholderKey: "qrTypePlaceholder.text", type: "text" },
 ];
 
 const PRESET_LOGOS: Record<PresetLogo, { label: string; svg: string; color: string }> = {
@@ -89,6 +90,7 @@ const STYLE_PREVIEW_CELLS = [
   [2, 3],
   [3, 0],
   [3, 2],
+  [3, 3],
 ] as const;
 
 function getShapePreviewStyle(
@@ -224,25 +226,21 @@ function ColorField({
 function LogoVariantSwitch({
   value,
   onChange,
+  t,
 }: {
   value: LogoVariant;
   onChange: (nextValue: LogoVariant) => void;
+  t: (key: TranslationKey) => string;
 }) {
-  const options: Array<{ value: LogoVariant; label: string }> = [
-    {
-      value: "color",
-      label: "Kolorowe",
-    },
-    {
-      value: "monochrome",
-      label: "Mono",
-    },
+  const options: Array<{ value: LogoVariant; labelKey: TranslationKey; ariaKey: TranslationKey }> = [
+    { value: "color", labelKey: "logoVariant.color", ariaKey: "logoVariant.ariaColor" },
+    { value: "monochrome", labelKey: "logoVariant.mono", ariaKey: "logoVariant.ariaMono" },
   ];
 
   return (
     <div className="flex flex-col gap-1.5 group">
       <span className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300 transition-colors">
-        Wariant logo
+        {t("logoVariant.title")}
       </span>
       <div className="flex items-center rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-1 shadow-sm transition-all">
         <div className="grid grid-cols-2 gap-1 w-full">
@@ -254,14 +252,14 @@ function LogoVariantSwitch({
                 key={option.value}
                 type="button"
                 aria-pressed={isActive}
-                aria-label={`Wariant logo ${option.label}`}
+                aria-label={t(option.ariaKey)}
                 onClick={() => onChange(option.value)}
                 className={`rounded-xl px-2 py-1.5 text-center transition-all ${isActive
                   ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm ring-1 ring-zinc-200 dark:ring-white/10"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-white/50 dark:hover:bg-zinc-800/50"
                   }`}
               >
-                <span className="block text-sm font-semibold">{option.label}</span>
+                <span className="block text-sm font-semibold">{t(option.labelKey)}</span>
               </button>
             );
           })}
@@ -337,7 +335,9 @@ export function drawLogoOnCanvas(
   backgroundColor = "#FFFFFF"
 ) {
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) {
+    return;
+  }
 
   const logoSize = Math.floor(canvas.width * logoSizeFraction);
   const x = Math.floor((canvas.width - logoSize) / 2);
@@ -377,7 +377,7 @@ export function presetLogoToDataUrl(
   const { svg, color } = PRESET_LOGOS[preset];
   const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);
   const innerSvg = svg.replace(/<svg[^>]*>/, "").replace("</svg>", "");
-  const iconViewBox = viewBoxMatch?.[1] ?? "0 0 24 24";
+  const iconViewBox = viewBoxMatch![1];
   const variant = options?.variant ?? "color";
   const badgeColor =
     variant === "monochrome"
@@ -425,7 +425,7 @@ export function injectLogoIntoSvg(
 export function validateInput(input: string, type: QrDataType): { valid: boolean; error?: string } {
   const trimmed = input.trim();
   if (!trimmed) {
-    return { valid: false, error: "To pole nie może być puste" };
+    return { valid: false, error: "error.empty" };
   }
 
   if (type === "url") {
@@ -433,21 +433,15 @@ export function validateInput(input: string, type: QrDataType): { valid: boolean
     try {
       parsed = new URL(trimmed);
     } catch {
-      return {
-        valid: false,
-        error: "Wprowadź poprawny URL (np. https://example.com)",
-      };
+      return { valid: false, error: "error.invalidUrl" };
     }
 
     if (!["http:", "https:"].includes(parsed.protocol)) {
-      return {
-        valid: false,
-        error: "Dozwolone są tylko linki http:// i https://",
-      };
+      return { valid: false, error: "error.invalidProtocol" };
     }
   } else if (type === "email") {
     if (!/^[\w.-]+@[\w.-]+\.\w+$/.test(trimmed)) {
-      return { valid: false, error: "Wprowadź poprawny adres e-mail" };
+      return { valid: false, error: "error.invalidEmail" };
     }
   }
 
@@ -515,6 +509,7 @@ function getQRFilename(ext: string): string {
 function ThemeSwitcher() {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
 
   // Next-themes hydration safety
   useEffect(() => {
@@ -532,8 +527,8 @@ function ThemeSwitcher() {
     <button
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       className="w-10 h-10 rounded-full flex items-center justify-center border border-zinc-200 dark:border-white/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-sm group"
-      title="Przełącz motyw"
-      aria-label="Przełącz motyw"
+      title={t("theme.toggle")}
+      aria-label={t("theme.toggle")}
     >
       <div className="relative w-5 h-5 flex items-center justify-center overflow-hidden">
         <Sun className="absolute w-5 h-5 text-zinc-600 dark:text-zinc-400 dark:hover:text-gold-400 hover:text-blue-500 transition-all duration-500 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" />
@@ -544,6 +539,7 @@ function ThemeSwitcher() {
 }
 
 export default function Home() {
+  const { t } = useI18n();
   const [qrType, setQrType] = useState<QrDataType>("url");
   const [url, setUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -607,7 +603,7 @@ export default function Home() {
     const trimmedUrl = url.trim();
     const validation = validateInput(trimmedUrl, qrType);
     if (!validation.valid) {
-      setError(validation.error ?? "Wprowadź poprawne dane");
+      setError(validation.error!);
       return;
     }
 
@@ -616,10 +612,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        throw new Error("Canvas not ready");
-      }
+      const canvas = canvasRef.current!;
 
       const finalQrData = formatQrData(trimmedUrl, qrType);
 
@@ -666,7 +659,7 @@ export default function Home() {
       );
       setWizardStep("result");
     } catch {
-      setError("Nie udalo sie wygenerowac kodu QR");
+      setError("error.generation");
     } finally {
       isGeneratingRef.current = false;
       setLoading(false);
@@ -674,11 +667,7 @@ export default function Home() {
   };
 
   const handleCopy = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !qrDataUrl) {
-      return;
-    }
-
+    const canvas = canvasRef.current!;
     try {
       clearCopyResetTimeout();
       await copyCanvasToClipboard(canvas);
@@ -688,18 +677,16 @@ export default function Home() {
         copyResetTimeoutRef.current = null;
       }, 2000);
     } catch {
-      downloadDataUrl(qrDataUrl, getQRFilename("png"));
+      downloadDataUrl(qrDataUrl!, getQRFilename("png"));
     }
   };
 
   const handleDownloadPng = () => {
-    if (!qrDataUrl) return;
-    downloadDataUrl(qrDataUrl, getQRFilename("png"));
+    downloadDataUrl(qrDataUrl!, getQRFilename("png"));
   };
 
   const handleDownloadSvg = () => {
-    if (!qrSvg) return;
-    downloadSvgString(qrSvg, getQRFilename("svg"));
+    downloadSvgString(qrSvg!, getQRFilename("svg"));
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -733,7 +720,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white p-3 sm:p-6 lg:p-8 lg:py-4 relative transition-colors duration-500">
-      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-8 z-50">
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-8 z-50 flex gap-2">
+        <LanguageSwitcher />
         <ThemeSwitcher />
       </div>
 
@@ -742,10 +730,10 @@ export default function Home() {
         <div className={`flex-1 lg:max-w-[42rem] flex flex-col pt-0 lg:pt-2 ${wizardStep === "result" ? "hidden" : "flex"}`}>
           <div className="mb-4 text-center lg:text-left">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-500 to-blue-500 dark:from-gold-400 dark:via-gold-500 dark:to-gold-600 mb-1.5 tracking-tight">
-              Generator QR
+              {t("title")}
             </h1>
             <p className="text-zinc-500 dark:text-zinc-400 text-sm sm:text-base max-w-xl mx-auto lg:mx-0">
-              Transformuj linki w eleganckie, luksusowe kody QR perfekcyjnej jakości. Ekskluzywne i darmowe narzędzie.
+              {t("subtitle")}
             </p>
           </div>
 
@@ -763,7 +751,7 @@ export default function Home() {
                   : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/30"
                   }`}
               >
-                Podstawowy
+                {t("tab.basic")}
               </button>
               <button
                 role="tab"
@@ -774,31 +762,31 @@ export default function Home() {
                   : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/30"
                   }`}
               >
-                Z logotypem
+                {t("tab.advanced")}
               </button>
             </div>
 
             <form className="flex flex-col gap-2.5" noValidate onSubmit={handleSubmit}>
               <div className="flex flex-col gap-1.5 mb-1">
                 <span className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                  Typ kodu QR
+                  {t("qrTypeSection")}
                 </span>
                 <div className="flex overflow-x-auto pb-2 -mb-2 gap-1.5 snap-x" style={{ scrollbarWidth: "none" }}>
-                  {QR_TYPES.map((t) => (
+                  {QR_TYPES.map((qrT) => (
                     <button
-                      key={t.value}
+                      key={qrT.value}
                       type="button"
                       onClick={() => {
-                        setQrType(t.value);
+                        setQrType(qrT.value);
                         setUrl("");
                         setError("");
                       }}
-                      className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all snap-center cursor-pointer ${qrType === t.value
+                      className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all snap-center cursor-pointer ${qrType === qrT.value
                         ? "bg-blue-500 text-white dark:bg-gold-500 dark:text-zinc-950 shadow-md ring-1 ring-blue-600 dark:ring-gold-400"
                         : "bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-white/5"
                         }`}
                     >
-                      {t.label}
+                      {t(qrT.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -808,18 +796,21 @@ export default function Home() {
                 htmlFor={URL_INPUT_ID}
                 className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300"
               >
-                {QR_TYPES.find(t => t.value === qrType)?.label || "Dane do zakodowania"}
+                {t(QR_TYPES.find(q => q.value === qrType)!.labelKey)}
               </label>
               <input
                 id={URL_INPUT_ID}
-                type={QR_TYPES.find(t => t.value === qrType)?.type || "text"}
+                type={QR_TYPES.find(q => q.value === qrType)!.type}
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
                   setError("");
                 }}
                 disabled={loading}
-                placeholder={QR_TYPES.find(t => t.value === qrType)?.placeholder || ""}
+                placeholder={(() => {
+                  const qrT = QR_TYPES.find(q => q.value === qrType)!;
+                  return qrT.placeholderKey ? t(qrT.placeholderKey) : qrT.defaultPlaceholder!;
+                })()}
                 autoComplete="off"
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? URL_ERROR_ID : undefined}
@@ -832,7 +823,7 @@ export default function Home() {
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1.5">
                         <span className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                          Styl modulu QR
+                          {t("qrStyle.title")}
                         </span>
                         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
                           {QR_STYLE_OPTIONS.map((option) => (
@@ -847,7 +838,7 @@ export default function Home() {
                                 }`}
                             >
                               <ModuleShapePreview moduleShape={option.value} />
-                              <span>{option.label}</span>
+                              <span>{t(`qrStyle.${option.value}` as TranslationKey)}</span>
                             </button>
                           ))}
                         </div>
@@ -855,19 +846,20 @@ export default function Home() {
 
                       <div className="grid gap-2 md:grid-cols-[10rem_10rem_minmax(12rem,1fr)]">
                         <ColorField
-                          label="Kolor kodu QR"
-                          pickerLabel="Wybierz kolor kodu QR"
+                          label={t("color.dark")}
+                          pickerLabel={t("color.dark.picker")}
                           value={darkColor}
                           onChange={setDarkColor}
                         />
                         <ColorField
-                          label="Kolor tla"
-                          pickerLabel="Wybierz kolor tla"
+                          label={t("color.light")}
+                          pickerLabel={t("color.light.picker")}
                           value={lightColor}
                           onChange={setLightColor}
                         />
                         <LogoVariantSwitch
                           value={logoVariant}
+                          t={t}
                           onChange={(nextValue) => {
                             setLogoVariant(nextValue);
                             if (qrDataUrl && selectedPreset) {
@@ -881,7 +873,7 @@ export default function Home() {
 
                   <div className="flex flex-col gap-1.5">
                     <span className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                      Logo w centrum kodu QR
+                      {t("logo.title")}
                     </span>
                     <div className="flex gap-1.5 items-center flex-wrap">
                       {(Object.keys(PRESET_LOGOS) as PresetLogo[]).map((key) => {
@@ -909,7 +901,7 @@ export default function Home() {
                       })}
                       <button
                         type="button"
-                        title="Wgraj wlasne logo"
+                        title={t("logo.upload")}
                         onClick={() => fileInputRef.current?.click()}
                         className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer border-2 shadow-sm ${customLogoUrl && !selectedPreset
                           ? "border-blue-500 ring-2 ring-blue-500/30 dark:border-gold-500 dark:ring-gold-500/30 bg-white dark:bg-zinc-800"
@@ -919,7 +911,7 @@ export default function Home() {
                         {customLogoUrl && !selectedPreset ? (
                           <Image
                             src={customLogoUrl}
-                            alt="Wlasne logo"
+                            alt={t("logo.customAlt")}
                             width={24}
                             height={24}
                             unoptimized
@@ -935,7 +927,7 @@ export default function Home() {
                         accept="image/*"
                         onChange={handleCustomLogoUpload}
                         className="hidden"
-                        aria-label="Wgraj wlasne logo"
+                        aria-label={t("logo.upload")}
                       />
                       {(selectedPreset || customLogoUrl) && (
                         <button
@@ -943,11 +935,11 @@ export default function Home() {
                           onClick={() => {
                             setSelectedPreset(null);
                             setCustomLogoUrl(null);
-                            if (fileInputRef.current) fileInputRef.current.value = "";
+                            fileInputRef.current!.value = "";
                           }}
                           className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors cursor-pointer ml-1"
                         >
-                          Usun logo
+                          {t("logo.remove")}
                         </button>
                       )}
                     </div>
@@ -957,7 +949,7 @@ export default function Home() {
 
               {error && (
                 <p id={URL_ERROR_ID} className="text-red-500 text-sm px-1 font-medium mt-1">
-                  {error}
+                  {t(error as TranslationKey)}
                 </p>
               )}
               <button
@@ -965,7 +957,7 @@ export default function Home() {
                 disabled={loading}
                 className="w-full mt-2 py-3 px-6 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 hover:from-blue-500 hover:via-blue-400 hover:to-blue-300 active:from-blue-700 active:to-blue-600 dark:from-gold-600 dark:via-gold-500 dark:to-gold-400 dark:hover:from-gold-500 dark:hover:via-gold-400 dark:hover:to-gold-300 dark:active:from-gold-700 dark:active:to-gold-600 disabled:from-zinc-200 disabled:to-zinc-200 dark:disabled:from-zinc-800 dark:disabled:to-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-500 text-white dark:text-zinc-950 font-bold tracking-wide rounded-xl text-base cursor-pointer disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] dark:shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] dark:hover:shadow-[0_0_30px_rgba(212,175,55,0.5)]"
               >
-                {loading ? "Generowanie..." : "Generuj kod QR"}
+                {loading ? t("generating") : t("generate")}
               </button>
             </form>
 
@@ -974,9 +966,9 @@ export default function Home() {
 
           {/* Footer links under controls */}
           <div className="text-zinc-500 dark:text-zinc-500 text-[11px] mt-6 space-y-1.5 text-center transition-colors">
-            <p>Kody generowane lokalnie.</p>
+            <p>{t("footer.local")}</p>
             <p className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
-              <span>Stworzone przez <span className="text-zinc-700 dark:text-zinc-400 font-medium">Krzysztof Brzezina</span></span>
+              <span>{t("footer.createdBy")} <span className="text-zinc-700 dark:text-zinc-400 font-medium">Krzysztof Brzezina</span></span>
               <span className="hidden sm:inline text-zinc-300 dark:text-zinc-700">|</span>
               <a
                 href="https://wa.me/48517466553"
@@ -999,14 +991,14 @@ export default function Home() {
                 href="/regulamin"
                 className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
               >
-                Regulamin i polityka
+                {t("footer.terms")}
               </a>
               <span className="text-zinc-300 dark:text-zinc-700">|</span>
               <button
                 onClick={resetCookieConsent}
                 className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors cursor-pointer"
               >
-                Ustawienia cookies
+                {t("footer.cookies")}
               </button>
             </p>
           </div>
@@ -1037,15 +1029,15 @@ export default function Home() {
                     <path d="M12 21v-1" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-medium text-zinc-900 dark:text-zinc-300 mb-2 transition-colors">Miejsce na Twój Kod QR</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-500 max-w-xs transition-colors">Wypełnij formularz obok i kliknij generuj, aby zobaczyć magię.</p>
+                <h3 className="text-xl font-medium text-zinc-900 dark:text-zinc-300 mb-2 transition-colors">{t("result.placeholder.title")}</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-500 max-w-xs transition-colors">{t("result.placeholder.desc")}</p>
               </div>
             )}
 
             {loading && (
               <div className="z-10 flex flex-col items-center animate-pulse">
                 <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 dark:border-gold-500/20 dark:border-t-gold-500 rounded-full animate-spin mb-4" />
-                <p className="text-blue-600 dark:text-gold-400 font-medium">Tworzenie arcydzieła...</p>
+                <p className="text-blue-600 dark:text-gold-400 font-medium">{t("result.loading")}</p>
               </div>
             )}
 
@@ -1056,7 +1048,7 @@ export default function Home() {
                   <div className="relative bg-white p-6 rounded-3xl shadow-2xl transition-transform duration-500 transform group-hover:scale-[1.02]">
                     <Image
                       src={qrDataUrl}
-                      alt="Twój Luksusowy Kod QR"
+                      alt={t("result.qrAlt")}
                       width={320}
                       height={320}
                       unoptimized
@@ -1068,7 +1060,7 @@ export default function Home() {
                 <div className="flex flex-wrap gap-3 justify-center w-full">
                   <button
                     onClick={handleCopy}
-                    title={copied ? "Skopiowano!" : "Kopiuj do schowka"}
+                    title={copied ? t("result.copiedTitle") : t("result.copyTitle")}
                     className={`flex items-center gap-2 px-5 py-3 rounded-2xl transition-all cursor-pointer font-medium shadow-md ${copied
                       ? "bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30"
                       : "bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:bg-zinc-100 dark:active:bg-zinc-600 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20"
@@ -1077,12 +1069,12 @@ export default function Home() {
                     {copied ? (
                       <>
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                        <span>Skopiowano</span>
+                        <span>{t("result.copied")}</span>
                       </>
                     ) : (
                       <>
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                        <span>Skopiuj</span>
+                        <span>{t("result.copy")}</span>
                       </>
                     )}
                   </button>
@@ -1090,7 +1082,7 @@ export default function Home() {
                   <div className="flex gap-2">
                     <button
                       onClick={handleDownloadPng}
-                      title="Pobierz wysokiej jakości PNG"
+                      title={t("result.downloadPng")}
                       className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:bg-zinc-100 dark:active:bg-zinc-600 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 transition-all shadow-md cursor-pointer font-medium"
                     >
                       <span>PNG</span>
@@ -1098,7 +1090,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={handleDownloadSvg}
-                      title="Pobierz wektorowy SVG"
+                      title={t("result.downloadSvg")}
                       className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:bg-zinc-100 dark:active:bg-zinc-600 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 transition-all shadow-md cursor-pointer font-medium"
                     >
                       <span>SVG</span>
@@ -1113,7 +1105,7 @@ export default function Home() {
                   className="mt-6 flex items-center justify-center gap-2 w-full py-4 text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-white transition-colors border border-zinc-200 dark:border-white/5 rounded-2xl bg-white/50 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-800 backdrop-blur-sm"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-                  <span>Edytuj projekt kodu QR</span>
+                  <span>{t("result.backToEdit")}</span>
                 </button>
               </div>
             )}
