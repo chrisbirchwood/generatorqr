@@ -4,14 +4,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import Home, {
   validateUrl,
   generateQRToCanvas,
+  generateQRToSVG,
   copyCanvasToClipboard,
   downloadDataUrl,
+  downloadSvgString,
 } from "./page";
 
 // Mock qrcode - dynamic import
 vi.mock("qrcode", () => ({
   default: {
     toCanvas: vi.fn().mockResolvedValue(undefined),
+    toString: vi.fn().mockResolvedValue("<svg>mock</svg>"),
   },
 }));
 
@@ -145,6 +148,30 @@ describe("copyCanvasToClipboard", () => {
   });
 });
 
+describe("generateQRToSVG", () => {
+  it("generuje SVG string", async () => {
+    const result = await generateQRToSVG("https://example.com");
+    expect(result).toBe("<svg>mock</svg>");
+  });
+});
+
+describe("downloadSvgString", () => {
+  it("tworzy blob URL i klika link", () => {
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreateElement(tag);
+      if (tag === "a") {
+        Object.defineProperty(el, "click", { value: mockClick });
+      }
+      return el;
+    });
+
+    downloadSvgString("<svg>test</svg>", "test.svg");
+    expect(mockClick).toHaveBeenCalled();
+  });
+});
+
 describe("downloadDataUrl", () => {
   it("tworzy link i klika go", () => {
     const mockClick = vi.fn();
@@ -234,10 +261,10 @@ describe("Home komponent", () => {
     ).toBeInTheDocument();
     expect(screen.queryByAltText("Kod QR")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Kopiuj" })
+      screen.queryByRole("button", { name: /kopiuj do schowka/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Pobierz" })
+      screen.queryByRole("button", { name: /pobierz jako png/i })
     ).not.toBeInTheDocument();
   });
 
@@ -249,10 +276,9 @@ describe("Home komponent", () => {
     await waitFor(() => {
       expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "Kopiuj" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Pobierz" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /kopiuj do schowka/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /pobierz jako png/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /pobierz jako svg/i })).toBeInTheDocument();
   });
 
   it("generuje QR po Enter", async () => {
@@ -331,10 +357,10 @@ describe("Home komponent", () => {
       expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
     });
 
-    await timerUser.click(screen.getByRole("button", { name: "Kopiuj" }));
+    await timerUser.click(screen.getByRole("button", { name: /kopiuj do schowka/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Skopiowano!")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /skopiowano/i })).toBeInTheDocument();
     });
 
     act(() => {
@@ -342,7 +368,7 @@ describe("Home komponent", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Kopiuj")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /kopiuj do schowka/i })).toBeInTheDocument();
     });
 
     vi.useRealTimers();
@@ -375,14 +401,14 @@ describe("Home komponent", () => {
       expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Kopiuj" }));
+    await user.click(screen.getByRole("button", { name: /kopiuj do schowka/i }));
 
     await waitFor(() => {
       expect(mockClick).toHaveBeenCalled();
     });
   });
 
-  it("pobiera QR po kliknieciu Pobierz", async () => {
+  it("pobiera QR jako PNG po kliknieciu ikony PNG", async () => {
     const mockClick = vi.fn();
     const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
@@ -401,7 +427,30 @@ describe("Home komponent", () => {
       expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Pobierz" }));
+    await user.click(screen.getByRole("button", { name: /pobierz jako png/i }));
+    expect(mockClick).toHaveBeenCalled();
+  });
+
+  it("pobiera QR jako SVG po kliknieciu ikony SVG", async () => {
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreateElement(tag);
+      if (tag === "a") {
+        Object.defineProperty(el, "click", { value: mockClick });
+      }
+      return el;
+    });
+
+    render(<Home />);
+    await user.type(getInput(), "https://example.com");
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(screen.getByAltText("Kod QR")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /pobierz jako svg/i }));
     expect(mockClick).toHaveBeenCalled();
   });
 
@@ -444,10 +493,10 @@ describe("Home komponent", () => {
 
     expect(screen.queryByAltText("Kod QR")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Kopiuj" })
+      screen.queryByRole("button", { name: /kopiuj do schowka/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Pobierz" })
+      screen.queryByRole("button", { name: /pobierz jako png/i })
     ).not.toBeInTheDocument();
   });
 
@@ -464,21 +513,10 @@ describe("Home komponent", () => {
     );
   });
 
-  it("nie pokazuje przyciskow Kopiuj/Pobierz bez QR", () => {
+  it("nie pokazuje przyciskow akcji bez QR", () => {
     render(<Home />);
-    expect(
-      screen.queryByRole("button", { name: "Pobierz" })
-    ).not.toBeInTheDocument();
-  });
-
-  it("Pobierz nic nie robi gdy brak qrDataUrl", async () => {
-    render(<Home />);
-    // Przycisk Pobierz nie istnieje bez QR, wiec ten branch jest pokryty
-    // przez "nie pokazuje przyciskow" test. handleDownload z null qrDataUrl
-    // jest pokryty przez to ze warunek if(qrDataUrl) w handleDownload
-    // nie tworzy linka
-    expect(
-      screen.queryByRole("button", { name: "Pobierz" })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /kopiuj do schowka/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pobierz jako png/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pobierz jako svg/i })).not.toBeInTheDocument();
   });
 });
