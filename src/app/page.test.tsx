@@ -13,6 +13,7 @@ import Home, {
   injectLogoIntoSvg,
   presetLogoToDataUrl,
   validateInput,
+  formatQrData,
 } from "./page";
 
 vi.mock("./qr-renderer", async () => {
@@ -34,7 +35,7 @@ vi.mock("./qr-renderer", async () => {
 });
 
 function getInput() {
-  return screen.getByRole("textbox", { name: /link|telefon|e-mail|whatsapp|tekst|dane do zakodowania/i });
+  return screen.getByRole("textbox", { name: /link|telefon|e-mail|whatsapp|telegram|signal|tekst|dane do zakodowania/i });
 }
 
 function getGenerateButton() {
@@ -100,6 +101,35 @@ describe("validateInput (email)", () => {
 
   it("akceptuje poprawny email", () => {
     expect(validateInput("jan@example.com", "email")).toEqual({ valid: true });
+  });
+});
+
+describe("formatQrData strings output check", () => {
+  it("formats generic text/url properly", () => {
+    expect(formatQrData("https://example.com", "url")).toBe("https://example.com");
+    expect(formatQrData("hello world", "text")).toBe("hello world");
+  });
+
+  it("formats phone schemas cleanly by stripping spaces", () => {
+    expect(formatQrData("+48 123 456 789", "phone")).toBe("tel:+48123456789");
+  });
+
+  it("formats whatsapp schemas using wa.me by stripping all non-digits", () => {
+    expect(formatQrData("+48 123 456 789", "whatsapp")).toBe("https://wa.me/48123456789");
+  });
+
+  it("formats telegram schemas using t.me and prepending +", () => {
+    expect(formatQrData("+48 123 456 789", "telegram")).toBe("https://t.me/+48123456789");
+    expect(formatQrData("48 123-456-789", "telegram")).toBe("https://t.me/+48123456789");
+  });
+
+  it("formats signal schemas using signal.me/#p/ and prepending +", () => {
+    expect(formatQrData("+1 (555) 123-4567", "signal")).toBe("https://signal.me/#p/+15551234567");
+    expect(formatQrData("1 555 123 4567", "signal")).toBe("https://signal.me/#p/+15551234567");
+  });
+
+  it("formats email schemas via mailto", () => {
+    expect(formatQrData("test@example.com", "email")).toBe("mailto:test@example.com");
   });
 });
 

@@ -28,13 +28,15 @@ type PresetLogo =
   | "telegram"
   | "signal";
 
-export type QrDataType = "url" | "phone" | "email" | "whatsapp" | "text";
+export type QrDataType = "url" | "phone" | "email" | "whatsapp" | "telegram" | "signal" | "text";
 
 export const QR_TYPES: { value: QrDataType; label: string; placeholder: string; type: string }[] = [
   { value: "url", label: "Link", placeholder: "https://example.com", type: "url" },
   { value: "phone", label: "Telefon", placeholder: "+48 123 456 789", type: "tel" },
   { value: "email", label: "E-mail", placeholder: "kontakt@example.com", type: "email" },
   { value: "whatsapp", label: "WhatsApp", placeholder: "+48 123 456 789", type: "tel" },
+  { value: "telegram", label: "Telegram", placeholder: "+48 123 456 789", type: "tel" },
+  { value: "signal", label: "Signal", placeholder: "+48 123 456 789", type: "tel" },
   { value: "text", label: "Tekst", placeholder: "Wpisz dowolny tekst...", type: "text" },
 ];
 
@@ -459,6 +461,10 @@ export function formatQrData(input: string, type: QrDataType): string {
       return `tel:${trimmed.replace(/\s+/g, "")}`;
     case "whatsapp":
       return `https://wa.me/${trimmed.replace(/\D/g, "")}`;
+    case "telegram":
+      return `https://t.me/+${trimmed.replace(/\D/g, "")}`;
+    case "signal":
+      return `https://signal.me/#p/+${trimmed.replace(/\D/g, "")}`;
     case "email":
       return `mailto:${trimmed}`;
     case "url":
