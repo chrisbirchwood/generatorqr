@@ -733,7 +733,7 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-10 justify-center">
         {/* Left Column - Controls (Hidden if step is "result") */}
-        <div className={`flex - 1 lg: max - w - [42rem] flex flex - col pt - 0 lg: pt - 2 ${wizardStep === "result" ? "hidden" : "flex"} `}>
+        <div className={`flex-1 lg:max-w-[42rem] flex flex-col pt-0 lg:pt-2 ${wizardStep === "result" ? "hidden" : "flex"}`}>
           <div className="mb-4 text-center lg:text-left">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-500 to-blue-500 dark:from-gold-400 dark:via-gold-500 dark:to-gold-600 mb-1.5 tracking-tight">
               Generator QR
@@ -752,10 +752,10 @@ export default function Home() {
                 role="tab"
                 aria-selected={tab === "basic"}
                 onClick={() => handleTabChange("basic")}
-                className={`flex - 1 py - 2 px - 3 rounded - xl text - sm font - semibold transition - all cursor - pointer ${tab === "basic"
+                className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${tab === "basic"
                   ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-gold-400 shadow-sm dark:shadow-lg ring-1 ring-zinc-200 dark:ring-white/10"
                   : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/30"
-                  } `}
+                  }`}
               >
                 Podstawowy
               </button>
@@ -763,10 +763,10 @@ export default function Home() {
                 role="tab"
                 aria-selected={tab === "advanced"}
                 onClick={() => handleTabChange("advanced")}
-                className={`flex - 1 py - 2 px - 3 rounded - xl text - sm font - semibold transition - all cursor - pointer ${tab === "advanced"
+                className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${tab === "advanced"
                   ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-gold-400 shadow-sm dark:shadow-lg ring-1 ring-zinc-200 dark:ring-white/10"
                   : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/30"
-                  } `}
+                  }`}
               >
                 Z logotypem
               </button>
@@ -835,10 +835,10 @@ export default function Home() {
                               type="button"
                               onClick={() => setModuleShape(option.value)}
                               aria-pressed={moduleShape === option.value}
-                              className={`flex flex - col items - center gap - 1.5 rounded - 2xl border px - 2 py - 2 text - xs font - semibold transition - all cursor - pointer ${moduleShape === option.value
+                              className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-2 text-xs font-semibold transition-all cursor-pointer ${moduleShape === option.value
                                 ? "border-blue-500 dark:border-gold-500 bg-blue-400/10 dark:bg-gold-500/10 text-blue-600 dark:text-gold-400 shadow-[0_0_10px_rgba(59,130,246,0.15)] dark:shadow-[0_0_10px_rgba(212,175,55,0.2)]"
                                 : "border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-white/20 hover:text-zinc-800 dark:hover:text-zinc-200"
-                                } `}
+                                }`}
                             >
                               <ModuleShapePreview moduleShape={option.value} />
                               <span>{option.label}</span>
@@ -905,10 +905,10 @@ export default function Home() {
                         type="button"
                         title="Wgraj wlasne logo"
                         onClick={() => fileInputRef.current?.click()}
-                        className={`w - 9 h - 9 rounded - lg flex items - center justify - center transition - all cursor - pointer border - 2 shadow - sm ${customLogoUrl && !selectedPreset
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer border-2 shadow-sm ${customLogoUrl && !selectedPreset
                           ? "border-blue-500 ring-2 ring-blue-500/30 dark:border-gold-500 dark:ring-gold-500/30 bg-white dark:bg-zinc-800"
                           : "border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/30 bg-zinc-50 dark:bg-zinc-900"
-                          } `}
+                          }`}
                       >
                         {customLogoUrl && !selectedPreset ? (
                           <Image
@@ -1007,7 +1007,7 @@ export default function Home() {
         </div>
 
         {/* Right Column - QR Code Result Area (Hidden if step is "form") */}
-        <div className={`flex - 1 lg: max - w - [45rem] mt - 8 lg: mt - 0 flex flex - col justify - center ${wizardStep === "form" ? "hidden" : "flex"} `}>
+        <div className={`flex-1 lg:max-w-[45rem] mt-8 lg:mt-0 flex flex-col justify-center ${wizardStep === "form" ? "hidden" : "flex"}`}>
           <div className="sticky top-12 lg:top-24 w-full h-full min-h-[500px] flex items-center justify-center bg-white/40 dark:bg-zinc-950/40 rounded-[2.5rem] border border-zinc-200 dark:border-white/5 relative overflow-hidden backdrop-blur-2xl shadow-xl dark:shadow-none transition-colors">
 
             {/* Subtle animated background glow for the right column */}
@@ -1063,10 +1063,10 @@ export default function Home() {
                   <button
                     onClick={handleCopy}
                     title={copied ? "Skopiowano!" : "Kopiuj do schowka"}
-                    className={`flex items - center gap - 2 px - 5 py - 3 rounded - 2xl transition - all cursor - pointer font - medium shadow - md ${copied
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl transition-all cursor-pointer font-medium shadow-md ${copied
                       ? "bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30"
                       : "bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:bg-zinc-100 dark:active:bg-zinc-600 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20"
-                      } `}
+                      }`}
                   >
                     {copied ? (
                       <>
