@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Generator kodów QR online",
     description:
       "Wklej link i wygeneruj kod QR w sekundę. Darmowy, bez rejestracji.",

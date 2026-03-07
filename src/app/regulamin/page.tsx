@@ -14,6 +14,29 @@ export const metadata: Metadata = {
 export default function RegulaminPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "Generator QR",
+                item: SITE_URL,
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: "Regulamin i Polityka Prywatności",
+                item: `${SITE_URL}/regulamin`,
+              },
+            ],
+          }),
+        }}
+      />
       <div className="mx-auto max-w-2xl">
         <Link
           href="/"

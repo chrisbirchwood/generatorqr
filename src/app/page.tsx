@@ -41,6 +41,11 @@ export const QR_TYPES: { value: QrDataType; labelKey: TranslationKey; placeholde
   { value: "text", labelKey: "qrType.text", placeholderKey: "qrTypePlaceholder.text", type: "text" },
 ];
 
+const QR_TYPE_MAP = new Map(QR_TYPES.map(q => [q.value, q]));
+
+const HEX_CHARS_RE = /[^0-9A-Fa-f]/g;
+const EMAIL_RE = /^[\w.-]+@[\w.-]+\.\w+$/;
+
 const PRESET_LOGOS: Record<PresetLogo, { label: string; svg: string; color: string }> = {
   whatsapp: {
     label: "WhatsApp",
@@ -176,14 +181,14 @@ function ColorField({
   onChange: (nextValue: string) => void;
 }) {
   const [textValue, setTextValue] = useState(value.replace(/^#/, ""));
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setTextValue(value.replace(/^#/, ""));
-  }, [value]);
+  }
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value.replace(/[^0-9A-Fa-f]/g, "").slice(0, 6).toUpperCase();
+    const newValue = e.target.value.replace(HEX_CHARS_RE, "").slice(0, 6).toUpperCase();
     setTextValue(newValue);
     if (newValue.length === 6 || newValue.length === 3) {
       onChange(normalizeHexColor("#" + newValue, value));
@@ -440,7 +445,7 @@ export function validateInput(input: string, type: QrDataType): { valid: boolean
       return { valid: false, error: "error.invalidProtocol" };
     }
   } else if (type === "email") {
-    if (!/^[\w.-]+@[\w.-]+\.\w+$/.test(trimmed)) {
+    if (!EMAIL_RE.test(trimmed)) {
       return { valid: false, error: "error.invalidEmail" };
     }
   }
@@ -796,11 +801,11 @@ export default function Home() {
                 htmlFor={URL_INPUT_ID}
                 className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300"
               >
-                {t(QR_TYPES.find(q => q.value === qrType)!.labelKey)}
+                {t(QR_TYPE_MAP.get(qrType)!.labelKey)}
               </label>
               <input
                 id={URL_INPUT_ID}
-                type={QR_TYPES.find(q => q.value === qrType)!.type}
+                type={QR_TYPE_MAP.get(qrType)!.type}
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
@@ -808,7 +813,7 @@ export default function Home() {
                 }}
                 disabled={loading}
                 placeholder={(() => {
-                  const qrT = QR_TYPES.find(q => q.value === qrType)!;
+                  const qrT = QR_TYPE_MAP.get(qrType)!;
                   return qrT.placeholderKey ? t(qrT.placeholderKey) : qrT.defaultPlaceholder!;
                 })()}
                 autoComplete="off"
@@ -929,7 +934,7 @@ export default function Home() {
                         className="hidden"
                         aria-label={t("logo.upload")}
                       />
-                      {(selectedPreset || customLogoUrl) && (
+                      {(selectedPreset || customLogoUrl) ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -941,17 +946,17 @@ export default function Home() {
                         >
                           {t("logo.remove")}
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </>
               )}
 
-              {error && (
+              {error ? (
                 <p id={URL_ERROR_ID} className="text-red-500 text-sm px-1 font-medium mt-1">
                   {t(error as TranslationKey)}
                 </p>
-              )}
+              ) : null}
               <button
                 type="submit"
                 disabled={loading}
@@ -1011,7 +1016,7 @@ export default function Home() {
             {/* Subtle animated background glow for the right column */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 dark:from-gold-500/5 to-transparent pointer-events-none" />
 
-            {!qrDataUrl && !loading && (
+            {!qrDataUrl && !loading ? (
               <div className="text-center p-8 flex flex-col items-center justify-center z-10 opacity-70">
                 <div className="w-24 h-24 rounded-3xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-6 transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 dark:text-zinc-600 transition-colors">
@@ -1032,16 +1037,16 @@ export default function Home() {
                 <h3 className="text-xl font-medium text-zinc-900 dark:text-zinc-300 mb-2 transition-colors">{t("result.placeholder.title")}</h3>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500 max-w-xs transition-colors">{t("result.placeholder.desc")}</p>
               </div>
-            )}
+            ) : null}
 
-            {loading && (
+            {loading ? (
               <div className="z-10 flex flex-col items-center animate-pulse">
                 <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 dark:border-gold-500/20 dark:border-t-gold-500 rounded-full animate-spin mb-4" />
                 <p className="text-blue-600 dark:text-gold-400 font-medium">{t("result.loading")}</p>
               </div>
-            )}
+            ) : null}
 
-            {qrDataUrl && !loading && (
+            {qrDataUrl && !loading ? (
               <div className="z-10 flex flex-col items-center gap-8 p-6 w-full max-w-md animate-in fade-in zoom-in duration-500">
                 <div className="relative group perspective-1000">
                   <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-blue-400 dark:from-gold-600 dark:to-gold-400 rounded-[2rem] blur-xl opacity-30 dark:opacity-20 group-hover:opacity-50 dark:group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
@@ -1108,7 +1113,7 @@ export default function Home() {
                   <span>{t("result.backToEdit")}</span>
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -1,17 +1,22 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getInput(page: import("@playwright/test").Page) {
+/** Input glowny — label zmienia sie z typem QR, wiec uzywamy stabilnego ID */
+function getInput(page: Page) {
   return page.locator("#qr-url");
 }
 
-function getGenerateButton(page: import("@playwright/test").Page) {
+function getGenerateButton(page: Page) {
   return page.getByRole("button", { name: /generuj|generate/i });
 }
 
+function getValidationError(page: Page) {
+  return page.locator("#qr-url-error");
+}
+
 /** Odrzuca cookie banner jesli jest widoczny */
-async function dismissCookieBanner(page: import("@playwright/test").Page) {
+async function dismissCookieBanner(page: Page) {
   const rejectBtn = page.getByRole("button", { name: /odrzuć|reject/i });
   if (await rejectBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await rejectBtn.click();
@@ -94,27 +99,27 @@ test.describe("Walidacja formularza", () => {
 
   test("wyswietla blad dla pustego pola", async ({ page }) => {
     await getGenerateButton(page).click();
-    await expect(page.locator("#qr-url-error")).toBeVisible();
+    await expect(getValidationError(page)).toBeVisible();
   });
 
   test("wyswietla blad dla niepoprawnego URL", async ({ page }) => {
     await getInput(page).fill("nie-url");
     await getGenerateButton(page).click();
-    await expect(page.locator("#qr-url-error")).toBeVisible();
+    await expect(getValidationError(page)).toBeVisible();
   });
 
   test("wyswietla blad dla niedozwolonego protokolu", async ({ page }) => {
     await getInput(page).fill("ftp://example.com");
     await getGenerateButton(page).click();
-    await expect(page.locator("#qr-url-error")).toBeVisible();
+    await expect(getValidationError(page)).toBeVisible();
   });
 
   test("czysci blad przy wpisywaniu", async ({ page }) => {
     await getGenerateButton(page).click();
-    await expect(page.locator("#qr-url-error")).toBeVisible();
+    await expect(getValidationError(page)).toBeVisible();
 
     await getInput(page).fill("a");
-    await expect(page.locator("#qr-url-error")).not.toBeVisible();
+    await expect(getValidationError(page)).not.toBeVisible();
   });
 });
 
@@ -312,14 +317,18 @@ test.describe("Przelacznik motywu", () => {
     const themeButton = page.getByRole("button", { name: /przełącz motyw|toggle theme/i });
     await expect(themeButton).toBeVisible();
 
-    // Odczytaj aktualny motyw
-    const htmlBefore = await page.locator("html").getAttribute("class");
+    const html = page.locator("html");
+    const classBefore = await html.getAttribute("class") ?? "";
+    const wasDark = classBefore.includes("dark");
 
     await themeButton.click();
 
-    // Klasa html powinna sie zmienic
-    const htmlAfter = await page.locator("html").getAttribute("class");
-    expect(htmlAfter).not.toBe(htmlBefore);
+    // Klasa html powinna sie zmienic (dark <-> light)
+    if (wasDark) {
+      await expect(html).toHaveClass(/light/);
+    } else {
+      await expect(html).toHaveClass(/dark/);
+    }
   });
 });
 
@@ -377,7 +386,7 @@ test.describe("Cookie banner", () => {
 
     // Po przeladowaniu banner nie wraca
     await page.reload();
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("heading", { name: /generator qr|qr generator/i })).toBeVisible();
     await expect(page.getByText(/analityki vercel|vercel analytics/i)).not.toBeVisible();
   });
 
@@ -408,8 +417,7 @@ test.describe("Strona regulaminu", () => {
   test("otwiera strone regulaminu", async ({ page }) => {
     await page.goto("/regulamin");
     await expect(page).toHaveURL("/regulamin");
-    // Strona powinna sie zaladowac bez bledu
-    await expect(page.locator("body")).not.toBeEmpty();
+    await expect(page.getByRole("heading", { name: /regulamin/i })).toBeVisible();
   });
 
   test("nawigacja z formularza do regulaminu", async ({ page }) => {
@@ -461,7 +469,7 @@ test.describe("Dostepnosc", () => {
     const input = getInput(page);
     await expect(input).toHaveAttribute("aria-invalid", "true");
     await expect(input).toHaveAttribute("aria-describedby", "qr-url-error");
-    await expect(page.locator("#qr-url-error")).toBeVisible();
+    await expect(getValidationError(page)).toBeVisible();
   });
 
   test("zakladki maja role tab i aria-selected", async ({ page }) => {
