@@ -28,6 +28,16 @@ type PresetLogo =
   | "telegram"
   | "signal";
 
+export type QrDataType = "url" | "phone" | "email" | "whatsapp" | "text";
+
+export const QR_TYPES: { value: QrDataType; label: string; placeholder: string; type: string }[] = [
+  { value: "url", label: "Link", placeholder: "https://example.com", type: "url" },
+  { value: "phone", label: "Telefon", placeholder: "+48 123 456 789", type: "tel" },
+  { value: "email", label: "E-mail", placeholder: "kontakt@example.com", type: "email" },
+  { value: "whatsapp", label: "WhatsApp", placeholder: "+48 123 456 789", type: "tel" },
+  { value: "text", label: "Tekst", placeholder: "Wpisz dowolny tekst...", type: "text" },
+];
+
 const PRESET_LOGOS: Record<PresetLogo, { label: string; svg: string; color: string }> = {
   whatsapp: {
     label: "WhatsApp",
@@ -276,7 +286,7 @@ function LogoPresetButton({
     <div className="group relative">
       <button
         type="button"
-        aria-label={label}
+        aria-label={`Logo ${label}`}
         onClick={onClick}
         className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer border-2 shadow-sm ${selected
           ? "border-blue-500 ring-2 ring-blue-500/30 dark:border-gold-500 dark:ring-gold-500/30"
@@ -410,30 +420,52 @@ export function injectLogoIntoSvg(
   return svgString.replace("</svg>", `${logoElement}</svg>`);
 }
 
-export function validateUrl(input: string): { valid: boolean; error?: string } {
+export function validateInput(input: string, type: QrDataType): { valid: boolean; error?: string } {
   const trimmed = input.trim();
   if (!trimmed) {
-    return { valid: false, error: "Wprowadz link" };
+    return { valid: false, error: "To pole nie może być puste" };
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    return {
-      valid: false,
-      error: "Wprowadz poprawny URL (np. https://example.com)",
-    };
-  }
+  if (type === "url") {
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return {
+        valid: false,
+        error: "Wprowadź poprawny URL (np. https://example.com)",
+      };
+    }
 
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    return {
-      valid: false,
-      error: "Dozwolone sa tylko linki http:// i https://",
-    };
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return {
+        valid: false,
+        error: "Dozwolone są tylko linki http:// i https://",
+      };
+    }
+  } else if (type === "email") {
+    if (!/^[\w.-]+@[\w.-]+\.\w+$/.test(trimmed)) {
+      return { valid: false, error: "Wprowadź poprawny adres e-mail" };
+    }
   }
 
   return { valid: true };
+}
+
+export function formatQrData(input: string, type: QrDataType): string {
+  const trimmed = input.trim();
+  switch (type) {
+    case "phone":
+      return `tel:${trimmed.replace(/\s+/g, "")}`;
+    case "whatsapp":
+      return `https://wa.me/${trimmed.replace(/\D/g, "")}`;
+    case "email":
+      return `mailto:${trimmed}`;
+    case "url":
+    case "text":
+    default:
+      return trimmed;
+  }
 }
 
 export async function copyCanvasToClipboard(
@@ -471,7 +503,7 @@ export function downloadSvgString(svg: string, filename: string) {
 }
 
 function getQRFilename(ext: string): string {
-  return `qr-${Date.now()}.${ext}`;
+  return `qr - ${Date.now()}.${ext} `;
 }
 
 function ThemeSwitcher() {
@@ -506,6 +538,7 @@ function ThemeSwitcher() {
 }
 
 export default function Home() {
+  const [qrType, setQrType] = useState<QrDataType>("url");
   const [url, setUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
@@ -566,9 +599,9 @@ export default function Home() {
     setQrSvg(null);
 
     const trimmedUrl = url.trim();
-    const validation = validateUrl(trimmedUrl);
+    const validation = validateInput(trimmedUrl, qrType);
     if (!validation.valid) {
-      setError(validation.error ?? "Wprowadz poprawny URL");
+      setError(validation.error ?? "Wprowadź poprawne dane");
       return;
     }
 
@@ -581,6 +614,8 @@ export default function Home() {
       if (!canvas) {
         throw new Error("Canvas not ready");
       }
+
+      const finalQrData = formatQrData(trimmedUrl, qrType);
 
       const appearance = isAdvancedTab
         ? {
@@ -601,11 +636,11 @@ export default function Home() {
       const ecLevel = activeLogoUrl ? "H" : "M";
 
       const [, svg] = await Promise.all([
-        generateQRToCanvas(canvas, trimmedUrl, {
+        generateQRToCanvas(canvas, finalQrData, {
           ...appearance,
           errorCorrectionLevel: ecLevel,
         }),
-        generateQRToSVG(trimmedUrl, {
+        generateQRToSVG(finalQrData, {
           ...appearance,
           errorCorrectionLevel: ecLevel,
         }),
@@ -698,7 +733,7 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-10 justify-center">
         {/* Left Column - Controls (Hidden if step is "result") */}
-        <div className={`flex-1 lg:max-w-[42rem] flex flex-col pt-0 lg:pt-2 ${wizardStep === "result" ? "hidden" : "flex"}`}>
+        <div className={`flex - 1 lg: max - w - [42rem] flex flex - col pt - 0 lg: pt - 2 ${wizardStep === "result" ? "hidden" : "flex"} `}>
           <div className="mb-4 text-center lg:text-left">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-500 to-blue-500 dark:from-gold-400 dark:via-gold-500 dark:to-gold-600 mb-1.5 tracking-tight">
               Generator QR
@@ -717,10 +752,10 @@ export default function Home() {
                 role="tab"
                 aria-selected={tab === "basic"}
                 onClick={() => handleTabChange("basic")}
-                className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${tab === "basic"
+                className={`flex - 1 py - 2 px - 3 rounded - xl text - sm font - semibold transition - all cursor - pointer ${tab === "basic"
                   ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-gold-400 shadow-sm dark:shadow-lg ring-1 ring-zinc-200 dark:ring-white/10"
                   : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/30"
-                  }`}
+                  } `}
               >
                 Podstawowy
               </button>
@@ -728,33 +763,58 @@ export default function Home() {
                 role="tab"
                 aria-selected={tab === "advanced"}
                 onClick={() => handleTabChange("advanced")}
-                className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${tab === "advanced"
+                className={`flex - 1 py - 2 px - 3 rounded - xl text - sm font - semibold transition - all cursor - pointer ${tab === "advanced"
                   ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-gold-400 shadow-sm dark:shadow-lg ring-1 ring-zinc-200 dark:ring-white/10"
                   : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/30"
-                  }`}
+                  } `}
               >
                 Z logotypem
               </button>
             </div>
 
             <form className="flex flex-col gap-2.5" noValidate onSubmit={handleSubmit}>
+              <div className="flex flex-col gap-1.5 mb-1">
+                <span className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                  Typ kodu QR
+                </span>
+                <div className="flex overflow-x-auto pb-2 -mb-2 gap-1.5 snap-x" style={{ scrollbarWidth: "none" }}>
+                  {QR_TYPES.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => {
+                        setQrType(t.value);
+                        setUrl("");
+                        setError("");
+                      }}
+                      className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all snap-center cursor-pointer ${qrType === t.value
+                        ? "bg-blue-500 text-white dark:bg-gold-500 dark:text-zinc-950 shadow-md ring-1 ring-blue-600 dark:ring-gold-400"
+                        : "bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-white/5"
+                        }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <label
                 htmlFor={URL_INPUT_ID}
                 className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300"
               >
-                Link do zakodowania
+                {QR_TYPES.find(t => t.value === qrType)?.label || "Dane do zakodowania"}
               </label>
               <input
                 id={URL_INPUT_ID}
-                type="url"
+                type={QR_TYPES.find(t => t.value === qrType)?.type || "text"}
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
                   setError("");
                 }}
                 disabled={loading}
-                placeholder="https://example.com"
-                autoComplete="url"
+                placeholder={QR_TYPES.find(t => t.value === qrType)?.placeholder || ""}
+                autoComplete="off"
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? URL_ERROR_ID : undefined}
                 className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
@@ -775,10 +835,10 @@ export default function Home() {
                               type="button"
                               onClick={() => setModuleShape(option.value)}
                               aria-pressed={moduleShape === option.value}
-                              className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-2 text-xs font-semibold transition-all cursor-pointer ${moduleShape === option.value
+                              className={`flex flex - col items - center gap - 1.5 rounded - 2xl border px - 2 py - 2 text - xs font - semibold transition - all cursor - pointer ${moduleShape === option.value
                                 ? "border-blue-500 dark:border-gold-500 bg-blue-400/10 dark:bg-gold-500/10 text-blue-600 dark:text-gold-400 shadow-[0_0_10px_rgba(59,130,246,0.15)] dark:shadow-[0_0_10px_rgba(212,175,55,0.2)]"
                                 : "border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-white/20 hover:text-zinc-800 dark:hover:text-zinc-200"
-                                }`}
+                                } `}
                             >
                               <ModuleShapePreview moduleShape={option.value} />
                               <span>{option.label}</span>
@@ -845,10 +905,10 @@ export default function Home() {
                         type="button"
                         title="Wgraj wlasne logo"
                         onClick={() => fileInputRef.current?.click()}
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer border-2 shadow-sm ${customLogoUrl && !selectedPreset
+                        className={`w - 9 h - 9 rounded - lg flex items - center justify - center transition - all cursor - pointer border - 2 shadow - sm ${customLogoUrl && !selectedPreset
                           ? "border-blue-500 ring-2 ring-blue-500/30 dark:border-gold-500 dark:ring-gold-500/30 bg-white dark:bg-zinc-800"
                           : "border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/30 bg-zinc-50 dark:bg-zinc-900"
-                          }`}
+                          } `}
                       >
                         {customLogoUrl && !selectedPreset ? (
                           <Image
@@ -947,7 +1007,7 @@ export default function Home() {
         </div>
 
         {/* Right Column - QR Code Result Area (Hidden if step is "form") */}
-        <div className={`flex-1 lg:max-w-[45rem] mt-8 lg:mt-0 flex flex-col justify-center ${wizardStep === "form" ? "hidden" : "flex"}`}>
+        <div className={`flex - 1 lg: max - w - [45rem] mt - 8 lg: mt - 0 flex flex - col justify - center ${wizardStep === "form" ? "hidden" : "flex"} `}>
           <div className="sticky top-12 lg:top-24 w-full h-full min-h-[500px] flex items-center justify-center bg-white/40 dark:bg-zinc-950/40 rounded-[2.5rem] border border-zinc-200 dark:border-white/5 relative overflow-hidden backdrop-blur-2xl shadow-xl dark:shadow-none transition-colors">
 
             {/* Subtle animated background glow for the right column */}
@@ -1003,10 +1063,10 @@ export default function Home() {
                   <button
                     onClick={handleCopy}
                     title={copied ? "Skopiowano!" : "Kopiuj do schowka"}
-                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl transition-all cursor-pointer font-medium shadow-md ${copied
+                    className={`flex items - center gap - 2 px - 5 py - 3 rounded - 2xl transition - all cursor - pointer font - medium shadow - md ${copied
                       ? "bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30"
                       : "bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 active:bg-zinc-100 dark:active:bg-zinc-600 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20"
-                      }`}
+                      } `}
                   >
                     {copied ? (
                       <>

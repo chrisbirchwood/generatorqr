@@ -12,7 +12,7 @@ import Home, {
   downloadSvgString,
   injectLogoIntoSvg,
   presetLogoToDataUrl,
-  validateUrl,
+  validateInput,
 } from "./page";
 
 vi.mock("./qr-renderer", async () => {
@@ -34,59 +34,72 @@ vi.mock("./qr-renderer", async () => {
 });
 
 function getInput() {
-  return screen.getByRole("textbox", { name: /link do zakodowania/i });
+  return screen.getByRole("textbox", { name: /link|telefon|e-mail|whatsapp|tekst|dane do zakodowania/i });
 }
 
 function getGenerateButton() {
   return screen.getByRole("button", { name: /generuj|generowanie/i });
 }
 
-describe("validateUrl", () => {
+describe("validateInput (url)", () => {
   it("zwraca blad dla pustego stringa", () => {
-    expect(validateUrl("")).toEqual({
+    expect(validateInput("", "url")).toEqual({
       valid: false,
-      error: "Wprowadz link",
+      error: "To pole nie może być puste",
     });
   });
 
   it("zwraca blad dla samych spacji", () => {
-    expect(validateUrl("   ")).toEqual({
+    expect(validateInput("   ", "url")).toEqual({
       valid: false,
-      error: "Wprowadz link",
+      error: "To pole nie może być puste",
     });
   });
 
   it("zwraca blad dla niepoprawnego URL", () => {
-    expect(validateUrl("nie-url")).toEqual({
+    expect(validateInput("nie-url", "url")).toEqual({
       valid: false,
-      error: "Wprowadz poprawny URL (np. https://example.com)",
+      error: "Wprowadź poprawny URL (np. https://example.com)",
     });
   });
 
   it("zwraca blad dla protokolu javascript:", () => {
-    expect(validateUrl("javascript:alert(1)")).toEqual({
+    expect(validateInput("javascript:alert(1)", "url")).toEqual({
       valid: false,
-      error: "Dozwolone sa tylko linki http:// i https://",
+      error: "Dozwolone są tylko linki http:// i https://",
     });
   });
 
   it("zwraca blad dla protokolu ftp:", () => {
-    expect(validateUrl("ftp://example.com")).toEqual({
+    expect(validateInput("ftp://example.com", "url")).toEqual({
       valid: false,
-      error: "Dozwolone sa tylko linki http:// i https://",
+      error: "Dozwolone są tylko linki http:// i https://",
     });
   });
 
   it("akceptuje http URL", () => {
-    expect(validateUrl("http://example.com")).toEqual({ valid: true });
+    expect(validateInput("http://example.com", "url")).toEqual({ valid: true });
   });
 
   it("akceptuje https URL", () => {
-    expect(validateUrl("https://example.com")).toEqual({ valid: true });
+    expect(validateInput("https://example.com", "url")).toEqual({ valid: true });
   });
 
   it("akceptuje URL ze spacjami na poczatku/koncu", () => {
-    expect(validateUrl("  https://example.com  ")).toEqual({ valid: true });
+    expect(validateInput("  https://example.com  ", "url")).toEqual({ valid: true });
+  });
+});
+
+describe("validateInput (email)", () => {
+  it("zwraca blad dla niepoprawnego emaila", () => {
+    expect(validateInput("jan.kowalski", "email")).toEqual({
+      valid: false,
+      error: "Wprowadź poprawny adres e-mail",
+    });
+  });
+
+  it("akceptuje poprawny email", () => {
+    expect(validateInput("jan@example.com", "email")).toEqual({ valid: true });
   });
 });
 
@@ -257,7 +270,7 @@ describe("Home komponent", () => {
     render(<Home />);
     expect(screen.getByText("Generator QR")).toBeInTheDocument();
     expect(getInput()).toBeInTheDocument();
-    expect(getInput()).toHaveAccessibleName("Link do zakodowania");
+    expect(getInput()).toHaveAccessibleName("Link");
     expect(getGenerateButton()).toBeInTheDocument();
   });
 
@@ -350,7 +363,7 @@ describe("Home komponent", () => {
       render(<Home />);
 
       await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
-      await user.click(screen.getByRole("button", { name: /whatsapp/i }));
+      await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
       await user.type(getInput(), "https://example.com");
       await user.click(getGenerateButton());
 
@@ -388,7 +401,7 @@ describe("Home komponent", () => {
     });
     await user.click(screen.getByRole("button", { name: /wariant logo mono/i }));
 
-    const whatsappButton = screen.getByRole("button", { name: /whatsapp/i });
+    const whatsappButton = screen.getByRole("button", { name: /logo whatsapp/i });
     expect(whatsappButton).toHaveStyle({ backgroundColor: "#12AB34" });
 
     const iconWrapper = whatsappButton.querySelector("span");
@@ -427,7 +440,7 @@ describe("Home komponent", () => {
   it("wyswietla blad walidacji dla pustego pola", async () => {
     render(<Home />);
     await user.click(getGenerateButton());
-    expect(screen.getByText("Wprowadz link")).toBeInTheDocument();
+    expect(screen.getByText("To pole nie może być puste")).toBeInTheDocument();
   });
 
   it("wyswietla blad walidacji dla niepoprawnego URL", async () => {
@@ -435,7 +448,7 @@ describe("Home komponent", () => {
     await user.type(getInput(), "nie-url");
     await user.click(getGenerateButton());
     expect(
-      screen.getByText("Wprowadz poprawny URL (np. https://example.com)")
+      screen.getByText("Wprowadź poprawny URL (np. https://example.com)")
     ).toBeInTheDocument();
   });
 
@@ -444,16 +457,16 @@ describe("Home komponent", () => {
     await user.type(getInput(), "ftp://example.com");
     await user.click(getGenerateButton());
     expect(
-      screen.getByText("Dozwolone sa tylko linki http:// i https://")
+      screen.getByText("Dozwolone są tylko linki http:// i https://")
     ).toBeInTheDocument();
   });
 
   it("czysci blad przy wpisywaniu", async () => {
     render(<Home />);
     await user.click(getGenerateButton());
-    expect(screen.getByText("Wprowadz link")).toBeInTheDocument();
+    expect(screen.getByText("To pole nie może być puste")).toBeInTheDocument();
     await user.type(getInput(), "a");
-    expect(screen.queryByText("Wprowadz link")).not.toBeInTheDocument();
+    expect(screen.queryByText("To pole nie może być puste")).not.toBeInTheDocument();
   });
 
   it("usuwa poprzedni QR po walidacyjnym bledzie kolejnej proby", async () => {
@@ -470,7 +483,7 @@ describe("Home komponent", () => {
     await user.click(getGenerateButton());
 
     expect(
-      screen.getByText("Wprowadz poprawny URL (np. https://example.com)")
+      screen.getByText("Wprowadź poprawny URL (np. https://example.com)")
     ).toBeInTheDocument();
     expect(screen.queryByAltText("Twój Luksusowy Kod QR")).not.toBeInTheDocument();
     expect(
@@ -478,6 +491,9 @@ describe("Home komponent", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText("PNG")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("SVG")
     ).not.toBeInTheDocument();
   });
 
@@ -752,13 +768,13 @@ describe("Home komponent", () => {
     render(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
     expect(screen.getByText(/logo w centrum/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /whatsapp/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /instagram/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^x$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /tiktok/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /facebook/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /telegram/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /signal/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo whatsapp/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo instagram/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo x/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo tiktok/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo facebook/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo telegram/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logo signal/i })).toBeInTheDocument();
     expect(screen.getByText("TikTok")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /wgraj wlasne logo/i })
@@ -776,16 +792,16 @@ describe("Home komponent", () => {
   it("pozwala wybrac preset logo i pokazuje przycisk Usun", async () => {
     render(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
-    await user.click(screen.getByRole("button", { name: /whatsapp/i }));
+    await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
     expect(screen.getByText(/usun logo/i)).toBeInTheDocument();
   });
 
   it("pozwala odznaczac preset logo klikajac ponownie", async () => {
     render(<Home />);
     await user.click(screen.getByRole("tab", { name: /z logotypem/i }));
-    await user.click(screen.getByRole("button", { name: /whatsapp/i }));
+    await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
     expect(screen.getByText(/usun logo/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /whatsapp/i }));
+    await user.click(screen.getByRole("button", { name: /logo whatsapp/i }));
     expect(screen.queryByText(/usun logo/i)).not.toBeInTheDocument();
   });
 
