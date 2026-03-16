@@ -422,7 +422,7 @@ export function injectLogoIntoSvg(
   const bgY = y - padding;
   const radius = Math.floor(bgSize * 0.15);
 
-  const logoElement = `<rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${radius}" fill="${backgroundColor}"/><image href="${logoDataUrl}" x="${x}" y="${y}" width="${logoSize}" height="${logoSize}"/>`;
+  const logoElement = `<rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${radius}" fill="${backgroundColor}"/><image xlink:href="${logoDataUrl}" x="${x}" y="${y}" width="${logoSize}" height="${logoSize}"/>`;
 
   return svgString.replace("</svg>", `${logoElement}</svg>`);
 }
@@ -498,7 +498,7 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
 }
 
 export function downloadSvgString(svg: string, filename: string) {
-  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.download = filename;
@@ -508,7 +508,7 @@ export function downloadSvgString(svg: string, filename: string) {
 }
 
 function getQRFilename(ext: string): string {
-  return `qr - ${Date.now()}.${ext} `;
+  return `qr-${Date.now()}.${ext}`;
 }
 
 function ThemeSwitcher() {

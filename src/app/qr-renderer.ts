@@ -534,7 +534,8 @@ function renderMatrixToSvg(
 ): string {
   const cellSize = options.width / (matrix.size + options.margin * 2);
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.width}" viewBox="0 0 ${options.width} ${options.width}">`,
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${options.width}" height="${options.width}" viewBox="0 0 ${options.width} ${options.width}">`,
     `<rect width="${options.width}" height="${options.width}" fill="${options.lightColor}"/>`,
   ];
 
@@ -579,7 +580,7 @@ function renderMatrixToSvg(
 
   parts.push("</svg>");
 
-  return parts.join("");
+  return parts.join("\n");
 }
 
 export function normalizeHexColor(value: string, fallback: string) {
