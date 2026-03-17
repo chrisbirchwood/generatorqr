@@ -90,6 +90,84 @@ test.describe("Typy kodow QR", () => {
   });
 });
 
+// ─── Wizytowka (vCard) ──────────────────────────────────────────────────────
+
+test.describe("Wizytowka (vCard)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await dismissCookieBanner(page);
+    await page.getByRole("button", { name: /wizyt|vcard/i }).click();
+  });
+
+  test("wyswietla formularz wizytowki po wyborze typu", async ({ page }) => {
+    // Pola wizytowki widoczne
+    await expect(page.locator("#vcard-firstName")).toBeVisible();
+    await expect(page.locator("#vcard-lastName")).toBeVisible();
+    await expect(page.locator("#vcard-company")).toBeVisible();
+    await expect(page.locator("#vcard-phone")).toBeVisible();
+    await expect(page.locator("#vcard-email")).toBeVisible();
+    await expect(page.locator("#vcard-website")).toBeVisible();
+
+    // Pojedynczy input URL nie jest widoczny
+    await expect(getInput(page)).not.toBeVisible();
+  });
+
+  test("wyswietla blad walidacji gdy brak imienia i nazwiska", async ({ page }) => {
+    await getGenerateButton(page).click();
+    await expect(getValidationError(page)).toBeVisible();
+  });
+
+  test("generuje QR dla wizytowki z imieniem", async ({ page }) => {
+    await page.locator("#vcard-firstName").fill("Jan");
+    await getGenerateButton(page).click();
+
+    const qrImage = page.getByAltText(/kod qr|qr code/i);
+    await expect(qrImage).toBeVisible({ timeout: 10000 });
+  });
+
+  test("generuje QR dla pelnej wizytowki", async ({ page }) => {
+    await page.locator("#vcard-firstName").fill("Jan");
+    await page.locator("#vcard-lastName").fill("Kowalski");
+    await page.locator("#vcard-company").fill("Firma ABC");
+    await page.locator("#vcard-phone").fill("+48123456789");
+    await page.locator("#vcard-email").fill("jan@example.com");
+    await page.locator("#vcard-website").fill("https://example.com");
+    await getGenerateButton(page).click();
+
+    const qrImage = page.getByAltText(/kod qr|qr code/i);
+    await expect(qrImage).toBeVisible({ timeout: 10000 });
+
+    // Przyciski akcji
+    await expect(page.getByRole("button", { name: /skopiuj|copy/i })).toBeVisible();
+    await expect(page.getByText("PNG").first()).toBeVisible();
+    await expect(page.getByText("SVG").first()).toBeVisible();
+  });
+
+  test("czysci pola po zmianie typu QR", async ({ page }) => {
+    await page.locator("#vcard-firstName").fill("Jan");
+    await page.locator("#vcard-lastName").fill("Kowalski");
+
+    // Zmien na Link
+    await page.getByRole("button", { name: "Link" }).click();
+    await expect(getInput(page)).toBeVisible();
+    await expect(getInput(page)).toHaveValue("");
+
+    // Wroc do wizytowki
+    await page.getByRole("button", { name: /wizyt|vcard/i }).click();
+    await expect(page.locator("#vcard-firstName")).toHaveValue("");
+    await expect(page.locator("#vcard-lastName")).toHaveValue("");
+  });
+
+  test("czysci blad przy wpisywaniu w pole wizytowki", async ({ page }) => {
+    await getGenerateButton(page).scrollIntoViewIfNeeded();
+    await getGenerateButton(page).click();
+    await expect(getValidationError(page)).toBeVisible();
+
+    await page.locator("#vcard-firstName").fill("J");
+    await expect(getValidationError(page)).not.toBeVisible();
+  });
+});
+
 // ─── Walidacja ───────────────────────────────────────────────────────────────
 
 test.describe("Walidacja formularza", () => {

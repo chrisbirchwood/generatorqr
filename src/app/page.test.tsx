@@ -16,8 +16,11 @@ import Home, {
   loadImage,
   presetLogoToDataUrl,
   validateInput,
+  validateVcard,
+  buildVcardString,
   formatQrData,
 } from "./page";
+import type { VcardData } from "./page";
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(<I18nProvider>{ui}</I18nProvider>);
@@ -161,6 +164,122 @@ describe("formatQrData strings output check", () => {
 
   it("formats email schemas via mailto", () => {
     expect(formatQrData("test@example.com", "email")).toBe("mailto:test@example.com");
+  });
+
+  it("passes vcard data through unchanged", () => {
+    const vcardStr = "BEGIN:VCARD\nVERSION:3.0\nEND:VCARD";
+    expect(formatQrData(vcardStr, "vcard")).toBe(vcardStr);
+  });
+});
+
+describe("validateVcard", () => {
+  const empty: VcardData = { firstName: "", lastName: "", company: "", phone: "", email: "", website: "" };
+
+  it("zwraca blad gdy brak imienia i nazwiska", () => {
+    expect(validateVcard(empty)).toEqual({ valid: false, error: "error.vcardName" });
+  });
+
+  it("zwraca blad dla samych spacji w imieniu i nazwisku", () => {
+    expect(validateVcard({ ...empty, firstName: "   ", lastName: "   " })).toEqual({
+      valid: false,
+      error: "error.vcardName",
+    });
+  });
+
+  it("akceptuje dane z samym imieniem", () => {
+    expect(validateVcard({ ...empty, firstName: "Jan" })).toEqual({ valid: true });
+  });
+
+  it("akceptuje dane z samym nazwiskiem", () => {
+    expect(validateVcard({ ...empty, lastName: "Kowalski" })).toEqual({ valid: true });
+  });
+
+  it("akceptuje pelne dane", () => {
+    expect(
+      validateVcard({
+        firstName: "Jan",
+        lastName: "Kowalski",
+        company: "Firma",
+        phone: "+48123456789",
+        email: "jan@example.com",
+        website: "https://example.com",
+      })
+    ).toEqual({ valid: true });
+  });
+});
+
+describe("buildVcardString", () => {
+  it("buduje minimalny vCard z samym imieniem", () => {
+    const result = buildVcardString({
+      firstName: "Jan",
+      lastName: "",
+      company: "",
+      phone: "",
+      email: "",
+      website: "",
+    });
+    expect(result).toBe("BEGIN:VCARD\nVERSION:3.0\nN:;Jan;;;\nFN:Jan\nEND:VCARD");
+  });
+
+  it("buduje minimalny vCard z samym nazwiskiem", () => {
+    const result = buildVcardString({
+      firstName: "",
+      lastName: "Kowalski",
+      company: "",
+      phone: "",
+      email: "",
+      website: "",
+    });
+    expect(result).toBe("BEGIN:VCARD\nVERSION:3.0\nN:Kowalski;;;;\nFN:Kowalski\nEND:VCARD");
+  });
+
+  it("buduje pelny vCard ze wszystkimi polami", () => {
+    const result = buildVcardString({
+      firstName: "Jan",
+      lastName: "Kowalski",
+      company: "Moja Firma",
+      phone: "+48 123 456 789",
+      email: "jan@example.com",
+      website: "https://example.com",
+    });
+    expect(result).toContain("BEGIN:VCARD");
+    expect(result).toContain("VERSION:3.0");
+    expect(result).toContain("N:Kowalski;Jan;;;");
+    expect(result).toContain("FN:Jan Kowalski");
+    expect(result).toContain("ORG:Moja Firma");
+    expect(result).toContain("TEL:+48 123 456 789");
+    expect(result).toContain("EMAIL:jan@example.com");
+    expect(result).toContain("URL:https://example.com");
+    expect(result).toContain("END:VCARD");
+  });
+
+  it("pomija puste pola opcjonalne", () => {
+    const result = buildVcardString({
+      firstName: "Jan",
+      lastName: "Kowalski",
+      company: "",
+      phone: "",
+      email: "",
+      website: "",
+    });
+    expect(result).not.toContain("ORG:");
+    expect(result).not.toContain("TEL:");
+    expect(result).not.toContain("EMAIL:");
+    expect(result).not.toContain("URL:");
+  });
+
+  it("trimuje wartosci pol", () => {
+    const result = buildVcardString({
+      firstName: "  Jan  ",
+      lastName: "  Kowalski  ",
+      company: "  Firma  ",
+      phone: "",
+      email: "",
+      website: "",
+    });
+    expect(result).toContain("N:Kowalski;Jan;;;");
+    expect(result).toContain("FN:Jan Kowalski");
+    expect(result).toContain("ORG:Firma");
   });
 });
 
@@ -981,6 +1100,100 @@ describe("Home komponent", () => {
     await user.click(screen.getByRole("button", { name: "Telefon" }));
     expect(getInput()).toHaveValue("");
     expect(screen.queryByText(/poprawny URL|valid URL/i)).not.toBeInTheDocument();
+  });
+
+  it("przelacza na typ vCard i wyswietla formularz wizytowki", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+
+    // Powinny pojawic sie pola wizytowki
+    expect(screen.getByLabelText(/imi/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/nazwisko/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/firma/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/tel/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/www|strona/i)).toBeInTheDocument();
+
+    // Pojedyncze pole inputu powinno byc ukryte
+    expect(screen.queryByRole("textbox", { name: "Link" })).not.toBeInTheDocument();
+  });
+
+  it("wyswietla blad walidacji vCard gdy brak imienia i nazwiska", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+    await user.click(getGenerateButton());
+
+    expect(screen.getByText(/imi.*nazwisko|first.*last/i)).toBeInTheDocument();
+  });
+
+  it("czysci blad vCard przy wpisywaniu w pola wizytowki", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+    await user.click(getGenerateButton());
+    expect(screen.getByText(/imi.*nazwisko|first.*last/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/imi/i), "Jan");
+    expect(screen.queryByText(/imi.*nazwisko|first.*last/i)).not.toBeInTheDocument();
+  });
+
+  it("generuje QR dla wizytowki z samym imieniem", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+    await user.type(screen.getByLabelText(/imi/i), "Jan");
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(generateQRToCanvas).toHaveBeenCalledWith(
+        expect.any(HTMLCanvasElement),
+        expect.stringContaining("BEGIN:VCARD"),
+        expect.any(Object)
+      );
+    });
+
+    const calledWith = vi.mocked(generateQRToCanvas).mock.calls[0][1];
+    expect(calledWith).toContain("FN:Jan");
+    expect(calledWith).toContain("N:;Jan;;;");
+  });
+
+  it("generuje QR dla pelnej wizytowki", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+
+    await user.type(screen.getByLabelText(/imi/i), "Jan");
+    await user.type(screen.getByLabelText(/nazwisko/i), "Kowalski");
+    await user.type(screen.getByLabelText(/firma/i), "Firma");
+    await user.type(screen.getByLabelText(/tel/i), "+48123456789");
+    await user.type(screen.getByLabelText(/e-mail/i), "jan@example.com");
+    await user.type(screen.getByLabelText(/www|strona/i), "https://example.com");
+
+    await user.click(getGenerateButton());
+
+    await waitFor(() => {
+      expect(generateQRToCanvas).toHaveBeenCalled();
+    });
+
+    const calledWith = vi.mocked(generateQRToCanvas).mock.calls[0][1];
+    expect(calledWith).toContain("BEGIN:VCARD");
+    expect(calledWith).toContain("FN:Jan Kowalski");
+    expect(calledWith).toContain("ORG:Firma");
+    expect(calledWith).toContain("TEL:+48123456789");
+    expect(calledWith).toContain("EMAIL:jan@example.com");
+    expect(calledWith).toContain("URL:https://example.com");
+    expect(calledWith).toContain("END:VCARD");
+  });
+
+  it("czysci pola vCard przy zmianie typu QR", async () => {
+    renderWithProviders(<Home />);
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+    await user.type(screen.getByLabelText(/imi/i), "Jan");
+
+    // Zmien typ na URL
+    await user.click(screen.getByRole("button", { name: "Link" }));
+    expect(getInput()).toHaveValue("");
+
+    // Wroc do vCard - pola powinny byc puste
+    await user.click(screen.getByRole("button", { name: /wizyt|vcard/i }));
+    expect(screen.getByLabelText(/imi/i)).toHaveValue("");
   });
 
   it("obsluguje wgrywanie wlasnego logo", async () => {

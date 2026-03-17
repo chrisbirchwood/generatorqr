@@ -25,9 +25,25 @@ const translations = {
     "qrType.telegram": "Telegram",
     "qrType.signal": "Signal",
     "qrType.text": "Tekst",
+    "qrType.vcard": "vCard",
     "qrType.fallbackLabel": "Dane do zakodowania",
     "qrTypePlaceholder.text": "Wpisz dowolny tekst...",
     "qrTypePlaceholder.email": "kontakt@example.com",
+
+    // vCard
+    "vcard.firstName": "Imie",
+    "vcard.lastName": "Nazwisko",
+    "vcard.company": "Firma",
+    "vcard.phone": "Nr tel",
+    "vcard.email": "E-mail",
+    "vcard.website": "Strona www",
+    "vcard.firstNamePlaceholder": "Jan",
+    "vcard.lastNamePlaceholder": "Kowalski",
+    "vcard.companyPlaceholder": "Nazwa firmy",
+    "vcard.phonePlaceholder": "+48 123 456 789",
+    "vcard.emailPlaceholder": "jan@example.com",
+    "vcard.websitePlaceholder": "https://example.com",
+    "error.vcardName": "Podaj imie lub nazwisko",
 
     // QR style
     "qrStyle.title": "Styl modulu QR",
@@ -118,9 +134,25 @@ const translations = {
     "qrType.telegram": "Telegram",
     "qrType.signal": "Signal",
     "qrType.text": "Text",
+    "qrType.vcard": "vCard",
     "qrType.fallbackLabel": "Data to encode",
     "qrTypePlaceholder.text": "Enter any text...",
     "qrTypePlaceholder.email": "contact@example.com",
+
+    // vCard
+    "vcard.firstName": "First name",
+    "vcard.lastName": "Last name",
+    "vcard.company": "Company",
+    "vcard.phone": "Phone number",
+    "vcard.email": "E-mail",
+    "vcard.website": "Website",
+    "vcard.firstNamePlaceholder": "John",
+    "vcard.lastNamePlaceholder": "Doe",
+    "vcard.companyPlaceholder": "Company name",
+    "vcard.phonePlaceholder": "+48 123 456 789",
+    "vcard.emailPlaceholder": "john@example.com",
+    "vcard.websitePlaceholder": "https://example.com",
+    "error.vcardName": "Enter first name or last name",
 
     // QR style
     "qrStyle.title": "QR module style",

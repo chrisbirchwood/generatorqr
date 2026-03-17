@@ -29,9 +29,27 @@ type PresetLogo =
   | "telegram"
   | "signal";
 
-export type QrDataType = "url" | "phone" | "email" | "whatsapp" | "telegram" | "signal" | "text";
+export type QrDataType = "url" | "phone" | "email" | "whatsapp" | "telegram" | "signal" | "text" | "vcard";
 
-export const QR_TYPES: { value: QrDataType; labelKey: TranslationKey; placeholderKey?: TranslationKey; defaultPlaceholder?: string; type: string }[] = [
+export type VcardData = {
+  firstName: string;
+  lastName: string;
+  company: string;
+  phone: string;
+  email: string;
+  website: string;
+};
+
+const EMPTY_VCARD_DATA: VcardData = {
+  firstName: "",
+  lastName: "",
+  company: "",
+  phone: "",
+  email: "",
+  website: "",
+};
+
+export const QR_TYPES: { value: QrDataType; labelKey: TranslationKey; placeholderKey?: TranslationKey; defaultPlaceholder?: string; type?: string }[] = [
   { value: "url", labelKey: "qrType.url", defaultPlaceholder: "https://example.com", type: "url" },
   { value: "phone", labelKey: "qrType.phone", defaultPlaceholder: "+48 123 456 789", type: "tel" },
   { value: "email", labelKey: "qrType.email", placeholderKey: "qrTypePlaceholder.email", type: "email" },
@@ -39,6 +57,7 @@ export const QR_TYPES: { value: QrDataType; labelKey: TranslationKey; placeholde
   { value: "telegram", labelKey: "qrType.telegram", defaultPlaceholder: "+48 123 456 789", type: "tel" },
   { value: "signal", labelKey: "qrType.signal", defaultPlaceholder: "+48 123 456 789", type: "tel" },
   { value: "text", labelKey: "qrType.text", placeholderKey: "qrTypePlaceholder.text", type: "text" },
+  { value: "vcard", labelKey: "qrType.vcard" },
 ];
 
 const QR_TYPE_MAP = new Map(QR_TYPES.map(q => [q.value, q]));
@@ -427,6 +446,34 @@ export function injectLogoIntoSvg(
   return svgString.replace("</svg>", `${logoElement}</svg>`);
 }
 
+/** Walidacja danych wizytowki - wymagane przynajmniej imie lub nazwisko */
+export function validateVcard(data: VcardData): { valid: boolean; error?: string } {
+  if (!data.firstName.trim() && !data.lastName.trim()) {
+    return { valid: false, error: "error.vcardName" };
+  }
+  return { valid: true };
+}
+
+/** Formatowanie danych wizytowki do formatu vCard 3.0 */
+export function buildVcardString(data: VcardData): string {
+  const lines: string[] = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `N:${data.lastName.trim()};${data.firstName.trim()};;;`,
+  ];
+
+  const fullName = [data.firstName.trim(), data.lastName.trim()].filter(Boolean).join(" ");
+  lines.push(`FN:${fullName}`);
+
+  if (data.company.trim()) lines.push(`ORG:${data.company.trim()}`);
+  if (data.phone.trim()) lines.push(`TEL:${data.phone.trim()}`);
+  if (data.email.trim()) lines.push(`EMAIL:${data.email.trim()}`);
+  if (data.website.trim()) lines.push(`URL:${data.website.trim()}`);
+
+  lines.push("END:VCARD");
+  return lines.join("\n");
+}
+
 export function validateInput(input: string, type: QrDataType): { valid: boolean; error?: string } {
   const trimmed = input.trim();
   if (!trimmed) {
@@ -466,6 +513,7 @@ export function formatQrData(input: string, type: QrDataType): string {
       return `https://signal.me/#p/+${trimmed.replace(/\D/g, "")}`;
     case "email":
       return `mailto:${trimmed}`;
+    case "vcard":
     case "url":
     case "text":
     default:
@@ -547,6 +595,7 @@ export default function Home() {
   const { t } = useI18n();
   const [qrType, setQrType] = useState<QrDataType>("url");
   const [url, setUrl] = useState("");
+  const [vcardData, setVcardData] = useState<VcardData>({ ...EMPTY_VCARD_DATA });
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -605,11 +654,23 @@ export default function Home() {
     setQrDataUrl(null);
     setQrSvg(null);
 
-    const trimmedUrl = url.trim();
-    const validation = validateInput(trimmedUrl, qrType);
-    if (!validation.valid) {
-      setError(validation.error!);
-      return;
+    // Walidacja i budowanie danych w zaleznosci od typu
+    let finalInput: string;
+    if (qrType === "vcard") {
+      const vcardValidation = validateVcard(vcardData);
+      if (!vcardValidation.valid) {
+        setError(vcardValidation.error!);
+        return;
+      }
+      finalInput = buildVcardString(vcardData);
+    } else {
+      const trimmedUrl = url.trim();
+      const validation = validateInput(trimmedUrl, qrType);
+      if (!validation.valid) {
+        setError(validation.error!);
+        return;
+      }
+      finalInput = trimmedUrl;
     }
 
     setError("");
@@ -619,7 +680,7 @@ export default function Home() {
     try {
       const canvas = canvasRef.current!;
 
-      const finalQrData = formatQrData(trimmedUrl, qrType);
+      const finalQrData = formatQrData(finalInput, qrType);
 
       const appearance = isAdvancedTab
         ? {
@@ -776,7 +837,7 @@ export default function Home() {
                 <span className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
                   {t("qrTypeSection")}
                 </span>
-                <div className="flex overflow-x-auto pb-2 -mb-2 gap-1.5 snap-x" style={{ scrollbarWidth: "none" }}>
+                <div className="flex flex-wrap gap-1.5">
                   {QR_TYPES.map((qrT) => (
                     <button
                       key={qrT.value}
@@ -784,9 +845,10 @@ export default function Home() {
                       onClick={() => {
                         setQrType(qrT.value);
                         setUrl("");
+                        setVcardData({ ...EMPTY_VCARD_DATA });
                         setError("");
                       }}
-                      className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all snap-center cursor-pointer ${qrType === qrT.value
+                      className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all cursor-pointer ${qrType === qrT.value
                         ? "bg-blue-500 text-white dark:bg-gold-500 dark:text-zinc-950 shadow-md ring-1 ring-blue-600 dark:ring-gold-400"
                         : "bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-white/5"
                         }`}
@@ -797,30 +859,130 @@ export default function Home() {
                 </div>
               </div>
 
-              <label
-                htmlFor={URL_INPUT_ID}
-                className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300"
-              >
-                {t(QR_TYPE_MAP.get(qrType)!.labelKey)}
-              </label>
-              <input
-                id={URL_INPUT_ID}
-                type={QR_TYPE_MAP.get(qrType)!.type}
-                value={url}
-                onChange={(e) => {
-                  setUrl(e.target.value);
-                  setError("");
-                }}
-                disabled={loading}
-                placeholder={(() => {
-                  const qrT = QR_TYPE_MAP.get(qrType)!;
-                  return qrT.placeholderKey ? t(qrT.placeholderKey) : qrT.defaultPlaceholder!;
-                })()}
-                autoComplete="off"
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? URL_ERROR_ID : undefined}
-                className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
-              />
+              {qrType === "vcard" ? (
+                <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="vcard-firstName" className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {t("vcard.firstName")}
+                      </label>
+                      <input
+                        id="vcard-firstName"
+                        type="text"
+                        value={vcardData.firstName}
+                        onChange={(e) => { setVcardData(prev => ({ ...prev, firstName: e.target.value })); setError(""); }}
+                        disabled={loading}
+                        placeholder={t("vcard.firstNamePlaceholder")}
+                        autoComplete="off"
+                        aria-invalid={Boolean(error)}
+                        className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="vcard-lastName" className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {t("vcard.lastName")}
+                      </label>
+                      <input
+                        id="vcard-lastName"
+                        type="text"
+                        value={vcardData.lastName}
+                        onChange={(e) => { setVcardData(prev => ({ ...prev, lastName: e.target.value })); setError(""); }}
+                        disabled={loading}
+                        placeholder={t("vcard.lastNamePlaceholder")}
+                        autoComplete="off"
+                        className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="vcard-company" className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      {t("vcard.company")}
+                    </label>
+                    <input
+                      id="vcard-company"
+                      type="text"
+                      value={vcardData.company}
+                      onChange={(e) => { setVcardData(prev => ({ ...prev, company: e.target.value })); setError(""); }}
+                      disabled={loading}
+                      placeholder={t("vcard.companyPlaceholder")}
+                      autoComplete="off"
+                      className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="vcard-phone" className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      {t("vcard.phone")}
+                    </label>
+                    <input
+                      id="vcard-phone"
+                      type="tel"
+                      value={vcardData.phone}
+                      onChange={(e) => { setVcardData(prev => ({ ...prev, phone: e.target.value })); setError(""); }}
+                      disabled={loading}
+                      placeholder={t("vcard.phonePlaceholder")}
+                      autoComplete="off"
+                      className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="vcard-email" className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      {t("vcard.email")}
+                    </label>
+                    <input
+                      id="vcard-email"
+                      type="email"
+                      value={vcardData.email}
+                      onChange={(e) => { setVcardData(prev => ({ ...prev, email: e.target.value })); setError(""); }}
+                      disabled={loading}
+                      placeholder={t("vcard.emailPlaceholder")}
+                      autoComplete="off"
+                      className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="vcard-website" className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      {t("vcard.website")}
+                    </label>
+                    <input
+                      id="vcard-website"
+                      type="url"
+                      value={vcardData.website}
+                      onChange={(e) => { setVcardData(prev => ({ ...prev, website: e.target.value })); setError(""); }}
+                      disabled={loading}
+                      placeholder={t("vcard.websitePlaceholder")}
+                      autoComplete="off"
+                      className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <label
+                    htmlFor={URL_INPUT_ID}
+                    className="px-1 text-sm font-medium text-zinc-600 dark:text-zinc-300"
+                  >
+                    {t(QR_TYPE_MAP.get(qrType)!.labelKey)}
+                  </label>
+                  <input
+                    id={URL_INPUT_ID}
+                    type={QR_TYPE_MAP.get(qrType)!.type}
+                    value={url}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      setError("");
+                    }}
+                    disabled={loading}
+                    placeholder={(() => {
+                      const qrT = QR_TYPE_MAP.get(qrType)!;
+                      return qrT.placeholderKey ? t(qrT.placeholderKey) : qrT.defaultPlaceholder!;
+                    })()}
+                    autoComplete="off"
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? URL_ERROR_ID : undefined}
+                    className="w-full px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-gold-500/50 focus:border-blue-500 dark:focus:border-gold-500 transition-all text-sm sm:text-base"
+                  />
+                </>
+              )}
 
               {tab === "advanced" && (
                 <>
